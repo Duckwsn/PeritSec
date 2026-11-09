@@ -1,0 +1,189 @@
+/* Administração local: contas, papéis e catálogo completo. */
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.admin-page .page-head {
+  margin-bottom: 0;
+}
+
+.admin-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--teal-wash);
+  border: 1px solid var(--teal-soft);
+  border-left: 2px solid var(--teal);
+}
+
+.admin-notice > svg {
+  margin-top: 0.15rem;
+  color: var(--teal);
+}
+
+.admin-notice p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.admin-notice p strong {
+  color: var(--ink);
+}
+
+.admin-page .progress-summary {
+  margin: 0;
+}
+
+.admin-page .page-section {
+  margin: 0;
+}
+
+.admin-page .section-head {
+  margin-bottom: var(--space-4);
+}
+
+.admin-page .table-wrap {
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+
+.admin-page .data-table {
+  min-width: 54rem;
+}
+
+.admin-page .data-table th {
+  white-space: nowrap;
+}
+
+.admin-page .data-table td {
+  vertical-align: top;
+}
+
+.admin-page .data-table .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.admin-account {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.admin-account > svg {
+  margin-top: 0.15rem;
+  color: var(--teal);
+  flex: none;
+}
+
+.admin-account > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.admin-account__username {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.admin-table__hint {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.admin-progress {
+  display: block;
+  font-size: var(--text-sm);
+}
+
+.admin-requirements {
+  display: block;
+  max-width: 26rem;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.admin-role-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-page .button--small {
+  white-space: nowrap;
+}
+
+.admin-aside-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--space-4);
+}
+
+.admin-page .aside-panel {
+  margin: 0;
+}
+
+.admin-page .aside-panel__title,
+.admin-entry .aside-panel__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.admin-page .aside-panel__title svg,
+.admin-entry .aside-panel__title svg {
+  color: var(--teal);
+  flex: none;
+}
+
+.admin-entry .button {
+  margin-top: var(--space-3);
+}
+
+.site-footer__links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+.site-footer__links a {
+  margin-left: 0;
+}
+
+@media (max-width: 940px) {
+  .admin-aside-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-notice {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-notice .tag {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .site-footer__links {
+    width: 100%;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+}

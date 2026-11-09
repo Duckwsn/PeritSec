@@ -1,0 +1,90 @@
+/* Tokens próprios do PeritSec — derivados de uma direção "instrumento técnico",
+   com papel quente, tinta grafite e verde-petróleo. Sem gradientes neon. */
+:root {
+  color-scheme: light;
+
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+
+  --paper: #f2f0e9;
+  --paper-raised: #fbfaf5;
+  --paper-sunken: #e9e6db;
+  --ink: #171c1a;
+  --ink-soft: #4c5853;
+  --ink-faint: #5e6963;
+  --line: #d6d2c4;
+  --line-strong: #aaa899;
+
+  --teal: #0d655d;
+  --teal-strong: #094e48;
+  --teal-soft: #e0ede9;
+  --teal-wash: #eef5f2;
+  --amber: #8c5414;
+  --amber-soft: #f4e8d4;
+  --rust: #963d2d;
+  --rust-soft: #f3e3de;
+  --green: #2d6748;
+  --green-soft: #e3eee6;
+  --blue: #2f5b76;
+  --blue-soft: #e4edf2;
+
+  --focus: #0d655d;
+
+  --lab-bg: #101714;
+  --lab-raised: #17211d;
+  --lab-sunken: #0b100e;
+  --lab-line: #2d3b35;
+  --lab-text: #e7ede8;
+  --lab-muted: #9aaba3;
+  --lab-accent: #6bd6c4;
+  --lab-amber: #e5b570;
+  --lab-red: #e28b7d;
+  --lab-green: #84c9a1;
+
+  --success: var(--green);
+  --warning: var(--amber);
+  --danger: var(--rust);
+
+  --text-xs: 0.75rem;
+  --text-label: 0.8125rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.5rem;
+  --text-2xl: clamp(1.5rem, 1.1rem + 1.2vw, 1.9rem);
+  --text-3xl: clamp(1.9rem, 1.2rem + 2.2vw, 2.75rem);
+  --text-4xl: clamp(2.3rem, 1.35rem + 3.4vw, 3.8rem);
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.72;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 5px;
+
+  --shadow-panel: 0 1px 0 rgba(23, 28, 26, 0.05);
+  --shadow-pop: 0 10px 30px rgba(12, 22, 18, 0.16);
+
+  --topbar-h: 3.75rem;
+  --content-max: 92rem;
+
+  --motion-fast: 100ms;
+  --motion-base: 170ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
