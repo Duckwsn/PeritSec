@@ -131,3 +131,21 @@ Verificações de navegador realizadas nesta etapa:
 3. Evoluir a captura sintética para múltiplos arquivos de fluxo, filtros por host e construção de linha do tempo a partir do próprio tráfego.
 4. Ampliar a revisão espaçada com registro de revisões concluídas e critérios de retenção por competência.
 5. Se houver laboratórios avançados, isolá-los em ambiente com limites, encerramento explícito e documentação de ferramentas externas opcionais.
+
+## Publicação simples no Render (sem persistência garantida)
+
+O PeritSec também pode ser publicado como um único **Web Service** no Render: o mesmo processo Node.js atende a interface compilada (`dist/`) e as rotas `/api/*`. Não é necessário criar um serviço separado na Vercel.
+
+Configuração sugerida para uso pequeno / experimental:
+
+- Runtime: Node.js (`.node-version` fixa a versão 24.22.2).
+- Build Command: `npm ci && npm run build`.
+- Start Command: `node server/index.mjs --serve`.
+- Health Check Path: `/api/health`.
+- Plano: Free, sem Persistent Disk.
+- `PERITSEC_DATA_DIR=/tmp/peritsec` (armazenamento temporário da instância).
+- `PERITSEC_SECURE_COOKIE=1` (cookies de sessão HTTPS).
+
+No Render, `RENDER_EXTERNAL_HOSTNAME` é fornecida automaticamente. O servidor usa essa variável para aceitar somente o hostname atribuído ao serviço, aceita requisições same-origin desse domínio e passa a escutar em `0.0.0.0`. Fora do Render, o comportamento continua restrito a `127.0.0.1`.
+
+**Limitação deliberada:** no plano Free, o sistema de arquivos é efêmero. SQLite, contas, sessões e progresso podem desaparecer quando o serviço suspender, reiniciar ou receber um novo deploy. O aplicativo não deve ser tratado como armazenamento durável. Exporte os dados importantes antes de encerrar uma sessão; a importação de arquivos JSON exportados ainda não está implementada nesta versão.

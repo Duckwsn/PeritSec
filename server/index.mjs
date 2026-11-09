@@ -39,6 +39,8 @@ const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST_DIR = join(ROOT_DIR, 'dist')
 const MAX_BODY_BYTES = 2_000_000
 const LOOPBACK_HOST = '127.0.0.1'
+const RENDER_HOSTNAME = String(process.env.RENDER_EXTERNAL_HOSTNAME ?? '').trim().toLowerCase()
+const BIND_HOST = process.env.HOST || (process.env.RENDER === 'true' ? '0.0.0.0' : LOOPBACK_HOST)
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -95,13 +97,30 @@ function sendJson(response, status, data, extraHeaders = {}) {
 
 function hostAllowed(hostHeader) {
   if (!hostHeader) return false
-  const host = String(hostHeader).toLowerCase()
-  return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)
+  const host = String(hostHeader).trim().toLowerCase()
+  if (/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host)) return true
+  return Boolean(RENDER_HOSTNAME && host === RENDER_HOSTNAME)
+}
+
+function originAllowed(origin, hostHeader) {
+  if (!origin || isLoopbackOrigin(origin)) return true
+  try {
+    const parsed = new URL(origin)
+    return Boolean(
+      process.env.RENDER === 'true' &&
+        RENDER_HOSTNAME &&
+        parsed.protocol === 'https:' &&
+        parsed.hostname.toLowerCase() === RENDER_HOSTNAME &&
+        parsed.host.toLowerCase() === String(hostHeader ?? '').trim().toLowerCase(),
+    )
+  } catch {
+    return false
+  }
 }
 
 function applyCors(request, response) {
   const origin = request.headers.origin
-  if (origin && isLoopbackOrigin(origin)) {
+  if (origin && originAllowed(origin, request.headers.host)) {
     response.setHeader('Access-Control-Allow-Origin', origin)
     response.setHeader('Vary', 'Origin')
     response.setHeader('Access-Control-Allow-Credentials', 'true')
@@ -335,7 +354,7 @@ async function handleApi(request, response, url) {
       anonymousProgressMigrated: anonymous.migrated,
       sessionPolicy: SESSION_POLICY,
       passwordPolicy: { minLength: PASSWORD_MIN_LENGTH, hashing: 'scrypt' },
-      localOnly: true,
+      localOnly: process.env.RENDER !== 'true',
     })
     return true
   }
@@ -842,7 +861,7 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host}`)
     const origin = request.headers.origin
 
-    if (url.pathname.startsWith('/api/') && origin && !isLoopbackOrigin(origin)) {
+    if (url.pathname.startsWith('/api/') && origin && !originAllowed(origin, request.headers.host)) {
       sendJson(response, 403, { error: 'origem não autorizada' })
       return
     }
@@ -850,7 +869,7 @@ const server = createServer(async (request, response) => {
     applyCors(request, response)
 
     if (request.method === 'OPTIONS') {
-      if (!origin || isLoopbackOrigin(origin)) {
+      if (!origin || originAllowed(origin, request.headers.host)) {
         response.writeHead(204)
         response.end()
       } else {
@@ -872,9 +891,9 @@ const server = createServer(async (request, response) => {
   }
 })
 
-server.listen(port, LOOPBACK_HOST, () => {
+server.listen(port, BIND_HOST, () => {
   const actualPort = server.address()?.port ?? port
-  console.log(`[peritsec] API local em http://${LOOPBACK_HOST}:${actualPort}`)
+  console.log(`[peritsec] API ${process.env.RENDER === 'true' ? 'publicada' : 'local'} em http://${BIND_HOST}:${actualPort}`)
   console.log(`[peritsec] dados em ${store.dataDir}`)
   console.log(`[peritsec] SQLite schema v${store.schemaVersion}`)
   if (serveStatic) console.log('[peritsec] servindo dist/ para uso offline')

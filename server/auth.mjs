@@ -175,12 +175,12 @@ export function parseCookies(header) {
 
 export function sessionCookie(token, expiresAt) {
   const maxAge = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000))
-  const secure = process.env.PERITSEC_SECURE_COOKIE === '1' ? '; Secure' : ''
+  const secure = process.env.PERITSEC_SECURE_COOKIE === '1' || process.env.RENDER === 'true' ? '; Secure' : ''
   return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`
 }
 
 export function clearSessionCookie() {
-  const secure = process.env.PERITSEC_SECURE_COOKIE === '1' ? '; Secure' : ''
+  const secure = process.env.PERITSEC_SECURE_COOKIE === '1' || process.env.RENDER === 'true' ? '; Secure' : ''
   return `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`
 }
 

@@ -311,10 +311,11 @@ export function MethodologyPage() {
               local. Não existe cópia automática em <code>localStorage</code>.
             </p>
             <p>
-              A API escuta apenas em <code>127.0.0.1</code>, aceita um conjunto fixo de rotas e não
-              executa comandos do sistema operacional. As contas são locais e não há envio automático
-              para servidor remoto, analytics de terceiros, OAuth, e-mail ou sincronização entre
-              dispositivos.
+              A API aceita apenas as rotas previstas e não executa comandos do sistema operacional.
+              No modo local, os dados ficam no computador; na versão publicada, ficam no SQLite do
+              servidor. A versão gratuita de hospedagem pode perder esses dados em reinicializações,
+              suspensão ou novos deploys. Não há analytics de terceiros, OAuth, e-mail ou sincronização
+              automática entre dispositivos.
             </p>
             <p>
               Backups são arquivos JSON no subdiretório <code>backups</code>, com hash SHA-256
