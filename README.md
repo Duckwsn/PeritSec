@@ -8,15 +8,13 @@ Aplicativo local, em português do Brasil, para treinar **metodologia de investi
 
 - **Vite + React 19 + TypeScript** como SPA, com **React Router**, ícones Lucide e IBM Plex Sans/Mono.
 - Motores puros em TypeScript (sem dependência de UI): `subnet.ts`, `crypto.ts`, `exercises.ts`, `network.ts`, `progress.ts`, `caseEngine.ts`, `trafficView.ts`.
-- **Backend local sem dependências externas**: `node:http` + `node:sqlite` (`DatabaseSync`), escutando apenas em `127.0.0.1:4317`.
-- **SQLite com migrações versionadas** (esquema v1): tabelas `progress`, `backups` e `schema_migrations`; WAL e `busy_timeout`.
-- **Diretório de dados persistente**, resolvido nesta ordem:
-  1. `PERITSEC_DATA_DIR`, quando definido;
-  2. `%APPDATA%\PeritSec` no Windows;
-  3. `~/.local/share/peritsec` em outros sistemas.
-- **Backups JSON com SHA-256** em `backups/`. A restauração confere o hash e cria uma cópia de segurança do estado atual antes de substituí-lo.
-- **Fallback deliberado**: se a API local não responder, a interface continua em modo somente navegador, usando `localStorage` (`peritsec:progress:v1`). O modo ativo é exibido em `/progresso`.
-- **Conflito de estado**: quando a API está disponível, o registro do servidor é a fonte principal. Se o registro local tiver alteração mais recente (por exemplo, uma ação feita com o servidor fora do ar), o estado local é reenviado. Se o banco ainda não tiver registro, o estado local é migrado automaticamente.
+- **Backend Node.js**: `node:http` com PostgreSQL via `pg`/Pool, escutando apenas em `127.0.0.1:4317`.
+- **PostgreSQL local via Docker Compose**, migrations versionadas e oito tabelas: `accounts`, `sessions`, `progress`, `account_progress`, `backups`, `account_backups`, `app_meta` e `schema_migrations`.
+- **Dados relacionais no PostgreSQL**: progresso em `JSONB`, datas em `TIMESTAMPTZ`, chaves estrangeiras com cascata e índice único case-insensitive para username.
+- **Arquivos de backup JSON com SHA-256** no diretório local `backups/`; os metadados ficam no PostgreSQL. Restaurar confere o hash e cria uma cópia de segurança do estado atual.
+- **Sem fallback de persistência para contas**: se o backend/PostgreSQL não responder, o progresso fica indisponível ou a gravação é indicada como pendente; não é copiado silenciosamente para outra conta nem persistido em `localStorage`.
+- **Senha e recuperação locais**: hashes scrypt no PostgreSQL; username, nome de exibição e senha bastam. Não há e-mail, OAuth, nuvem ou serviço externo. A primeira conta só recebe papel admin automaticamente em desenvolvimento local; não há conta ou credencial predefinida.
+- `PERITSEC_DATA_DIR` configura apenas os arquivos JSON de backup. Os arquivos do banco ficam no volume Docker `peritsec-postgres-data`.
 - `npm start` compila e serve `dist/` pelo mesmo servidor local em `http://127.0.0.1:4173`, com CSP e fallback de SPA.
 - O servidor de desenvolvimento Vite usa proxy de `/api` para `http://127.0.0.1:4317`.
 
@@ -33,21 +31,49 @@ Salvaguardas implementadas: vínculo exclusivo ao loopback, verificação de `Ho
 
 ## Como executar
 
-Requisitos: **Node.js 24+** (necessário para `node:sqlite`) e npm.
+Requisitos: **Node.js 24+**, npm e Docker Desktop com Docker Compose.
+
+1. Copie `.env.example` para `.env` e atualize `POSTGRES_PASSWORD` e `DATABASE_URL` com a mesma senha.
+2. Inicie o banco local:
+
+   ```bash
+   docker compose up -d --wait
+   ```
+
+3. Instale dependências, aplique as migrations e inicie o app:
+
+   ```bash
+   npm install
+   npm run db:migrate
+   npm run dev
+   ```
+
+O frontend abre em `http://localhost:5173`; a API local usa `http://127.0.0.1:4317`. O servidor também aplica migrations pendentes ao iniciar e espera o PostgreSQL por um período limitado. O comando `npm run server` inicia só a API; `npm start` compila e serve `dist/`.
+
+Comandos de manutenção:
 
 ```bash
-npm install
-npm run dev        # API local + interface em http://localhost:5173
-npm run dev:web    # apenas Vite; a interface cai no modo localStorage
-npm run server     # apenas a API local em 127.0.0.1:4317
-npm start          # build + serve dist/ e API em http://127.0.0.1:4173
-npm test           # testes de interface e motores (Vitest)
-npm run test:server# testes do SQLite e da API (node:test)
-npm run lint       # oxlint
-npm run build      # typecheck (tsc -b) + build de produção
+docker compose stop       # para o PostgreSQL sem remover o volume
+docker compose start      # inicia novamente com os mesmos dados
+docker compose down       # remove o container, mas preserva o volume
+npm run db:migrate        # aplica migrations pendentes
+npm test                  # testes de interface e motores (Vitest)
+npm run test:server       # testes PostgreSQL/API em schema isolado
+npm run lint              # oxlint
+npm run build             # typecheck e build
 ```
 
-O modo SQLite grava em `%APPDATA%\PeritSec\peritsec.db` no Windows. Faça um backup pela página **Meu progresso** antes de remover esse diretório. Backups e exportações podem conter anotações digitadas por você: trate-os como material de trabalho.
+**Não use `docker compose down -v` se quiser manter os dados.** Isso apaga o volume do PostgreSQL. Os JSONs de backup ficam em `%APPDATA%\PeritSec\backups` no Windows (ou no diretório indicado por `PERITSEC_DATA_DIR`); eles são arquivos separados do volume. Senhas e códigos de recuperação não são exibidos nem registrados em logs.
+
+### Importar uma instalação SQLite existente
+
+Se houver uma instalação anterior com `peritsec.db`, inicie o PostgreSQL e execute a importação explicitamente após criar `.env`:
+
+```powershell
+npm run db:import-sqlite -- --source "$env:APPDATA\PeritSec\peritsec.db"
+```
+
+O importador aceita também `--backup-dir <diretório>` quando os arquivos JSON não estiverem em `backups/` ao lado do banco. Ele abre o SQLite somente para leitura, valida schema v3, integridade, hashes e arquivos de backup, exige uma base PostgreSQL sem dados de aplicação e informa as contagens importadas. A operação é idempotente para a mesma origem; a origem SQLite não é removida nem alterada. O PostgreSQL novo não importa dados automaticamente no startup.
 
 ## Funcionalidades implementadas
 
@@ -74,7 +100,7 @@ O modo SQLite grava em `%APPDATA%\PeritSec\peritsec.db` no Windows. Faça um bac
 
 ### Progresso
 - Página `/progresso` com mapa de competências, trilhas, casos, histórico (limite de 80 entradas), exportação JSON e limpeza do progresso.
-- **Persistência verificável**: modo SQLite, caminho do diretório de dados, última gravação, criação/restauração de backups com hash e fallback explícito para o navegador.
+- **Persistência verificável**: PostgreSQL local, última gravação, criação/restauração de backups com hash e aviso quando o backend ou o banco estiver indisponível.
 - **Revisão recomendada**: até três exercícios, priorizando (1) resposta incorreta, (2) acerto com pista, (3) acerto após mais de uma tentativa e (4) acerto com mais de sete dias. A fila sugere prática e não altera pontos nem bloqueia avanço.
 - A pontuação do caso completo credita apenas a competência de perícia.
 
@@ -88,35 +114,28 @@ Direção própria: **dossiê pericial / painel de instrumento** — papel quent
 - Contraste AA, corpo em 16 px, foco visível, alvos de toque de pelo menos 44 px e hierarquia de cabeçalhos.
 - Auditoria por captura nas larguras **375, 768 e 1280 px**, sem overflow horizontal nas páginas verificadas.
 
-## Testes e verificações (executados)
+## Testes e verificações
 
 | Comando | Resultado |
 | --- | --- |
-| `npx tsc -b --pretty false` | passa, sem erros |
-| `npm run lint` (oxlint) | passa com 3 avisos não bloqueantes (`only-export-components` e `set-state-in-effect` em contextos conhecidos) |
-| `npm test` (Vitest) | **7 arquivos / 48 testes passando** (sub-redes, criptografia, exercícios, motor de rede, motor de caso, progresso e filtros de tráfego) |
-| `npm run test:server` (node:test) | **11 testes passando** (migração/persistência, validação, backup/restauração, hash adulterado, API, CORS) |
-| `npm run build` | passa; aviso de chunk > 500 kB (**633,71 kB / 185,73 kB gzip**) |
+| `npx tsc -b --pretty false` | aprovado |
+| `npm run lint` | aprovado com 4 avisos existentes de Fast Refresh/setState |
+| `npm test` | **9 arquivos / 68 testes aprovados** |
+| `npm run test:server` | **21 testes PostgreSQL/API aprovados**, schema isolado |
+| `npm run build` | aprovado; aviso não bloqueante de chunk JavaScript acima de 500 kB |
 
-Verificações de navegador realizadas nesta etapa:
-
-- modo **SQLite** ativo com caminho real, criação de backup, restauração com cópia de segurança prévia (`-pre-restauracao`) e persistência após reiniciar API e interface;
-- laboratório de rede com correção de gateway `10.30.4.1` e conclusão verificada; captura de tráfego com 19 pacotes, filtro DNS, limpeza de filtros e **3/3** respostas; laboratório criptográfico com **4/4** etapas;
-- caso com verificação SHA-256 de `E-01`, anotação registrada e progresso persistido;
-- gaveta móvel em 375 px: foco em “Fechar menu”, `Esc`, retorno a “Abrir menu” e ausência de overflow em 375/768/1280 px;
-- build de produção servido por `--serve` em `127.0.0.1:4174`, sem erros de console e com API de mesma origem;
-- Lighthouse (desktop): acessibilidade, boas práticas e SEO em **100**, após ajuste do nome acessível da marca.
+O cadastro foi validado na interface contra o PostgreSQL; sessão e progresso carregaram, e um backup apareceu na página. A conta temporária de verificação foi removida ao final.
 
 ## Limitações conhecidas
 
-- Aplicativo **local e monousuário**. Não há autenticação, sincronização entre dispositivos, painel de turma ou hospedagem. O banco SQLite pode ser apagado ou corrompido pelo ambiente; backups são locais.
-- Se a API estiver indisponível, o progresso fica apenas no navegador e pode ser perdido ao limpar dados ou trocar de navegador.
+- Aplicativo de instalação local, com múltiplas contas no mesmo computador. Não há sincronização com outros dispositivos ou painel de turma. PostgreSQL e arquivos de backup precisam ser preservados separadamente.
+- Se o PostgreSQL/API estiver indisponível, o progresso de conta não é persistido no navegador; alterações ainda não enviadas podem ser perdidas ao fechar ou recarregar a página.
 - Hashes SHA-256 demonstram **integridade da cópia** exibida; não comprovam origem, autoria ou veracidade histórica.
 - O laboratório de tráfego é um recorte de cabeçalhos sintéticos e não demonstra comprometimento, exfiltração, autoria ou intenção.
 - A criptoanálise cobre cifras clássicas e codificação; não há quebra de criptografia moderna nem promessa disso.
-- Ferramentas externas (Wireshark, TShark, GNS3, Docker, suítes forenses) **não** são executadas nem anunciadas como integrações. Não há execução arbitrária de comandos; o isolamento dos laboratórios é lógico, não por contêiner.
+- Ferramentas externas (Wireshark, TShark, GNS3, suítes forenses) **não** são executadas nem anunciadas como integrações. Docker Compose é usado apenas para o PostgreSQL local. Não há execução arbitrária de comandos; o isolamento dos laboratórios é lógico.
 - Apenas um caso completo; os demais estão marcados como “em preparação”.
-- O caminho de dados tem prioridade para Windows (`%APPDATA%`); Linux/macOS usam o fallback documentado.
+- O volume PostgreSQL e o diretório de backup são armazenamentos distintos. Remover um não remove o outro.
 
 ## Referências normativas
 
@@ -132,20 +151,6 @@ Verificações de navegador realizadas nesta etapa:
 4. Ampliar a revisão espaçada com registro de revisões concluídas e critérios de retenção por competência.
 5. Se houver laboratórios avançados, isolá-los em ambiente com limites, encerramento explícito e documentação de ferramentas externas opcionais.
 
-## Publicação simples no Render (sem persistência garantida)
+## Produção
 
-O PeritSec também pode ser publicado como um único **Web Service** no Render: o mesmo processo Node.js atende a interface compilada (`dist/`) e as rotas `/api/*`. Não é necessário criar um serviço separado na Vercel.
-
-Configuração sugerida para uso pequeno / experimental:
-
-- Runtime: Node.js (`.node-version` fixa a versão 24.22.2).
-- Build Command: `npm ci && npm run build`.
-- Start Command: `node server/index.mjs --serve`.
-- Health Check Path: `/api/health`.
-- Plano: Free, sem Persistent Disk.
-- `PERITSEC_DATA_DIR=/tmp/peritsec` (armazenamento temporário da instância).
-- `PERITSEC_SECURE_COOKIE=1` (cookies de sessão HTTPS).
-
-No Render, `RENDER_EXTERNAL_HOSTNAME` é fornecida automaticamente. O servidor usa essa variável para aceitar somente o hostname atribuído ao serviço, aceita requisições same-origin desse domínio e passa a escutar em `0.0.0.0`. Fora do Render, o comportamento continua restrito a `127.0.0.1`.
-
-**Limitação deliberada:** no plano Free, o sistema de arquivos é efêmero. SQLite, contas, sessões e progresso podem desaparecer quando o serviço suspender, reiniciar ou receber um novo deploy. O aplicativo não deve ser tratado como armazenamento durável. Exporte os dados importantes antes de encerrar uma sessão; a importação de arquivos JSON exportados ainda não está implementada nesta versão.
+Deploy, Render, Vercel e configurações de produção estão fora do escopo desta migração local e não foram alterados nem validados. A implantação em produção exige uma revisão e configuração próprias de PostgreSQL e segurança.

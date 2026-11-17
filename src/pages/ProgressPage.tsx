@@ -179,7 +179,7 @@ export function ProgressPage() {
 
   useEffect(() => {
     let cancelled = false
-    if (storageMode !== 'sqlite') return
+    if (storageMode !== 'postgresql') return
     void listBackups().then((items) => {
       if (!cancelled) setBackups(items)
     })
@@ -301,8 +301,8 @@ export function ProgressPage() {
           <>
             <span className="meta-item">
               <ShieldCheck size={14} aria-hidden="true" />{' '}
-              {storageMode === 'sqlite'
-                ? 'SQLite local ativo, por conta'
+              {storageMode === 'postgresql'
+                ? 'PostgreSQL local ativo, por conta'
                 : storageMode === 'checking'
                   ? 'verificando persistência'
                   : 'servidor local indisponível'}
@@ -334,8 +334,8 @@ export function ProgressPage() {
           <div>
             <strong>O servidor local não confirmou a gravação.</strong>
             <p>
-              As alterações desta sessão ficam pendentes no navegador e não são gravadas em outra
-              conta. Verifique se a API local está em execução antes de fechar a página.
+              As alterações ainda não foram confirmadas no PostgreSQL e estão apenas na memória desta
+              página. Verifique se a API local está em execução antes de continuar ou recarregar.
             </p>
           </div>
         </div>
@@ -646,51 +646,51 @@ export function ProgressPage() {
       <section className="data-section" aria-labelledby="data-title">
         <SectionHeading
           title="Onde seu progresso está"
-          description="O estado é gravado em SQLite no computador, em um registro separado para esta conta. Sem o servidor local, a gravação fica pausada e a interface informa o problema."
+          description="O estado é gravado no PostgreSQL local, em um registro separado para esta conta. Sem o backend conectado ao banco, a gravação fica pausada e a interface informa o problema."
         />
         <div className="data-panel" id="data-title">
           <div className="data-panel__copy">
             <div className="storage-status">
               <span className="storage-status__badge">
-                {storageMode === 'sqlite' ? (
+                {storageMode === 'postgresql' ? (
                   <Database size={15} aria-hidden="true" />
                 ) : (
                   <HardDrive size={15} aria-hidden="true" />
                 )}
-                {storageMode === 'sqlite'
-                  ? `SQLite local · ${username}`
+                {storageMode === 'postgresql'
+                  ? `PostgreSQL local · ${username}`
                   : storageMode === 'checking'
-                    ? 'verificando servidor local'
-                    : 'servidor local indisponível'}
+                    ? 'verificando PostgreSQL local'
+                    : 'PostgreSQL local indisponível'}
               </span>
-              {storageMode === 'sqlite' && storageUpdatedAt && (
+              {storageMode === 'postgresql' && storageUpdatedAt && (
                 <span className="mono storage-status__time">
                   última gravação em {formatDateTime(storageUpdatedAt)}
                 </span>
               )}
             </div>
             <h3>Persistência, cópias e remoção</h3>
-            {storageMode === 'sqlite' ? (
+            {storageMode === 'postgresql' ? (
               <>
                 <p>
-                  O estado desta conta é gravado em SQLite em{' '}
-                  <code>{storageDataDir || 'diretório de dados do aplicativo'}</code>. Outras contas
-                  desta instalação não leem nem recebem este histórico. Não existe cópia automática
-                  em <code>localStorage</code>.
+                  O progresso desta conta é gravado no PostgreSQL, separado das demais contas. Os
+                  arquivos de backup ficam no subdiretório <code>backups/</code> de{' '}
+                  <code>{storageDataDir || 'diretório de dados do aplicativo'}</code>. Não existe
+                  cópia automática em <code>localStorage</code>.
                 </p>
                 <p>
-                  Cada backup é um arquivo JSON vinculado a esta conta no mesmo diretório de dados,
-                  com hash SHA-256 registrado. A restauração confere o hash e cria uma cópia de
-                  segurança do estado atual antes de substituí-lo.
+                  Cada backup é um arquivo JSON vinculado a esta conta, com hash SHA-256 registrado
+                  no PostgreSQL. A restauração confere o hash e cria uma cópia de segurança do estado
+                  atual antes de substituí-lo.
                 </p>
               </>
             ) : storageMode === 'checking' ? (
-              <p>Verificando se o servidor local está disponível para gravar em SQLite.</p>
+              <p>Verificando se o PostgreSQL local está disponível para gravar o progresso.</p>
             ) : (
               <>
                 <p>
-                  O servidor local não respondeu. A gravação em SQLite está pausada; o progresso
-                  exibido não é enviado a outra conta nem substituído silenciosamente por um estado
+                  O PostgreSQL local não respondeu. A gravação está pausada; o progresso não é
+                  copiado para o navegador, enviado a outra conta nem substituído por um estado
                   anônimo.
                 </p>
                 <p>
@@ -714,7 +714,7 @@ export function ProgressPage() {
             <button type="button" className="button button--outline" onClick={exportProgress}>
               <Download size={15} aria-hidden="true" /> Baixar progresso (.json)
             </button>
-            {storageMode === 'sqlite' && (
+            {storageMode === 'postgresql' && (
               <button
                 type="button"
                 className="button button--outline"
@@ -761,7 +761,7 @@ export function ProgressPage() {
           </div>
         </div>
 
-        {storageMode === 'sqlite' && (
+        {storageMode === 'postgresql' && (
           <div className="backup-panel">
             <div className="backup-panel__head">
               <h3>Cópias desta conta no computador</h3>

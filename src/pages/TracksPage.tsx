@@ -172,7 +172,7 @@ export function TracksPage() {
           <div>
             <h3>Registro local por conta</h3>
             <p>
-              O histórico permanece neste dispositivo, em SQLite local, separado por conta, e pode ser
+              O histórico permanece neste dispositivo, no PostgreSQL local, separado por conta, e pode ser
               copiado na página de progresso.
             </p>
           </div>

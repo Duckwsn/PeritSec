@@ -295,7 +295,7 @@ export function MethodologyPage() {
       <section aria-label="Segurança dos dados e privacidade">
         <SectionHeading
           title="Dados, privacidade e segurança operacional"
-          description="O aplicativo grava em SQLite, por conta local, quando o servidor está ativo. Não há envio para serviços externos nem cópia automática no navegador."
+          description="O aplicativo grava no PostgreSQL local, por conta, quando o backend está conectado. Não há envio para serviços externos nem cópia automática no navegador."
         />
         <div className="method-grid">
           <div className="method-panel">
@@ -306,21 +306,20 @@ export function MethodologyPage() {
             <p>
               Identificadores de lições, exercícios, laboratórios e casos; pontuações; horários;
               notas e relatórios que você digitar; e um histórico resumido de atividade. O estado
-              fica em SQLite, no diretório de dados do aplicativo
-              (<code>%APPDATA%\PeritSec</code> no Windows), em um registro separado para cada conta
-              local. Não existe cópia automática em <code>localStorage</code>.
+              fica no PostgreSQL local, em um registro separado para cada conta. Não existe cópia
+              automática em <code>localStorage</code>.
             </p>
             <p>
               A API aceita apenas as rotas previstas e não executa comandos do sistema operacional.
-              No modo local, os dados ficam no computador; na versão publicada, ficam no SQLite do
-              servidor. A versão gratuita de hospedagem pode perder esses dados em reinicializações,
-              suspensão ou novos deploys. Não há analytics de terceiros, OAuth, e-mail ou sincronização
-              automática entre dispositivos.
+              Nesta etapa, a persistência roda no PostgreSQL do ambiente local via Docker Compose.
+              Não há analytics de terceiros, OAuth, e-mail ou sincronização automática entre
+              dispositivos.
             </p>
             <p>
-              Backups são arquivos JSON no subdiretório <code>backups</code>, com hash SHA-256
-              registrado. Restaurar confere o hash e cria uma cópia de segurança do estado atual
-              antes de substituí-lo. A exportação JSON é gerada pelo navegador.
+              Backups são arquivos JSON no subdiretório <code>backups</code> do diretório local de
+              dados, com hash SHA-256 registrado no PostgreSQL. Restaurar confere o hash e cria uma
+              cópia de segurança do estado atual antes de substituí-lo. A exportação JSON é gerada
+              pelo navegador.
             </p>
           </div>
           <div className="method-panel">
@@ -336,9 +335,9 @@ export function MethodologyPage() {
               adequados.
             </p>
             <p>
-              Se o servidor local estiver indisponível, o progresso usa apenas o armazenamento do
-              navegador. Use a exportação ou um backup antes de limpar os dados do navegador ou
-              remover o diretório de dados.
+              Se o PostgreSQL local estiver indisponível, o acesso ao progresso é pausado até a
+              conexão ser restabelecida. Alterações ainda não confirmadas ficam apenas na memória da
+              página; não há persistência de progresso de conta no navegador.
             </p>
           </div>
         </div>
@@ -355,10 +354,9 @@ export function MethodologyPage() {
             <div>
               <h3>Contas e backend locais</h3>
               <p>
-                O progresso fica em SQLite neste computador e não acompanha você entre navegadores ou
-                dispositivos. A senha pode ser redefinida apenas com o código de recuperação local.
-                Não há painel de turma nem sincronização remota. A API aceita apenas conexões de
-                loopback.
+                O progresso fica no PostgreSQL deste computador. O backend aceita apenas conexões de
+                loopback, sem sincronização com outros dispositivos. A senha pode ser redefinida
+                apenas com o código de recuperação local.
               </p>
             </div>
           </article>
@@ -437,7 +435,7 @@ export function MethodologyPage() {
               <li>React, TypeScript e Vite; motores puros para rede, sub-redes, criptografia e rubrica.</li>
               <li>SHA-256 implementado em TypeScript e conferido por testes automatizados.</li>
               <li>
-                Persistência em SQLite com migrações versionadas, validação de esquema, backup e
+                Persistência em PostgreSQL com migrações versionadas, validação de esquema, backup e
                 restauração com hash.
               </li>
               <li>

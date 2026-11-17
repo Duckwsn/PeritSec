@@ -100,7 +100,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     const remote = await fetchRemoteProgress()
     if (remote.status === 'ok') {
       setProgress(remote.progress)
-      setStorageMode('sqlite')
+      setStorageMode('postgresql')
       setStorageDataDir(remote.dataDir)
       setStorageUpdatedAt(remote.updatedAt)
       setStorageAvailable(true)
@@ -110,7 +110,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     }
     if (remote.status === 'empty') {
       setProgress(createEmptyProgress())
-      setStorageMode('sqlite')
+      setStorageMode('postgresql')
       setStorageDataDir(remote.dataDir)
       setStorageUpdatedAt(null)
       setStorageAvailable(true)
@@ -128,7 +128,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       return
     }
     setProgress(createEmptyProgress())
-    setStorageMode('local')
+    setStorageMode('unavailable')
     setStorageAvailable(false)
     setStorageError(remote.error)
     setStorageUpdatedAt(null)
@@ -148,7 +148,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   }, [hydrate])
 
   useEffect(() => {
-    if (!hydrated || !accountId || storageMode !== 'sqlite') return
+    if (!hydrated || !accountId || storageMode !== 'postgresql') return
 
     const timer = window.setTimeout(() => {
       void saveRemoteProgress(progress, accountId).then((result) => {
@@ -188,7 +188,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     if (!result.ok) return { ok: false, error: result.error }
     setProgress(result.progress)
     setStorageUpdatedAt(result.updatedAt)
-    setStorageMode('sqlite')
+    setStorageMode('postgresql')
     setStorageError(null)
     return { ok: true }
   }, [])
@@ -281,7 +281,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     ],
   )
 
-  const progressUnavailable = Boolean(accountId) && !hydrated && storageMode === 'local'
+  const progressUnavailable = Boolean(accountId) && !hydrated && storageMode === 'unavailable'
   const progressLoading = Boolean(accountId) && !hydrated && storageMode === 'checking'
 
   if (progressUnavailable) {
@@ -291,8 +291,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
           <div className="storage-gate__panel">
             <h1>O servidor local não respondeu.</h1>
             <p>
-              O progresso desta conta fica no SQLite local. Sem a API, a interface não abre conteúdo
-              nem grava alterações para evitar misturar contas ou simular um progresso inexistente.
+              O progresso desta conta fica no PostgreSQL da instalação local. Sem a API, a interface
+              não abre conteúdo nem grava alterações para evitar misturar contas ou simular um
+              progresso inexistente.
             </p>
             {storageError && <p className="storage-gate__detail">{storageError}</p>}
             <button type="button" className="button button--primary" onClick={() => void reload()}>

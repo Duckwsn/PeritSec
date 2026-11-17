@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import pg from 'pg'
 import {
   ONBOARDING_STATUSES,
   SCHEMA_VERSION,
@@ -19,9 +20,30 @@ import {
   verifyPassword,
   verifyRecoveryCode,
 } from './auth.mjs'
+import { createIsolatedTestDatabase } from './test-utils.mjs'
 
+const { Pool } = pg
 const PASSWORD = 'SenhaLocal#2026'
 const RECOVERY = 'ABCD-EFGH-JKLM'
+
+test('identifica PostgreSQL indisponível sem expor a URL de conexão', async () => {
+  const previousAttempts = process.env.PERITSEC_DB_CONNECT_ATTEMPTS
+  const dataDir = mkdtempSync(join(tmpdir(), 'peritsec-pg-unavailable-'))
+  process.env.PERITSEC_DB_CONNECT_ATTEMPTS = '1'
+  try {
+    await assert.rejects(
+      openStore({
+        connectionString: 'postgres://peritsec:test@127.0.0.1:1/peritsec',
+        dataDir,
+      }),
+      (error) => error.code === 'DATABASE_UNAVAILABLE' && !error.message.includes('test'),
+    )
+  } finally {
+    if (previousAttempts === undefined) delete process.env.PERITSEC_DB_CONNECT_ATTEMPTS
+    else process.env.PERITSEC_DB_CONNECT_ATTEMPTS = previousAttempts
+    rmSync(dataDir, { recursive: true, force: true })
+  }
+})
 
 function progressFixture(label = 'estado inicial') {
   return {
@@ -48,20 +70,7 @@ function progressFixture(label = 'estado inicial') {
   }
 }
 
-function createTempStore() {
-  const dataDir = mkdtempSync(join(tmpdir(), 'peritsec-test-'))
-  const store = openStore({ dataDir })
-  return {
-    dataDir,
-    store,
-    cleanup() {
-      store.close()
-      rmSync(dataDir, { recursive: true, force: true })
-    },
-  }
-}
-
-function register(store, username, overrides = {}) {
+async function register(store, username, overrides = {}) {
   return store.registerAccount({
     displayName: overrides.displayName ?? `Pessoa ${username}`,
     username,
@@ -71,209 +80,286 @@ function register(store, username, overrides = {}) {
     initialExpertise: overrides.initialExpertise ?? overrides.expertise ?? 'iniciante',
     onboardingStatus: overrides.onboardingStatus ?? 'pending',
     migrateAnonymous: overrides.migrateAnonymous ?? false,
+    ...(overrides.session ? { session: overrides.session } : {}),
   })
 }
 
-test('aplica o esquema v3 e preserva o progresso legado após reabrir o banco', () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'peritsec-persist-'))
-  const first = openStore({ dataDir })
-  assert.equal(first.schemaVersion, SCHEMA_VERSION)
-  assert.equal(first.schemaVersion, 3)
-  const state = progressFixture()
-  first.writeProgress(state)
-  assert.deepEqual(first.readProgress().progress, state)
-  assert.equal(first.hasAccounts(), false)
-  first.close()
+async function withStore(run) {
+  const database = await createIsolatedTestDatabase()
+  const store = await database.openStore()
+  try {
+    await run({ database, store })
+  } finally {
+    await store.close()
+    await database.cleanup()
+  }
+}
 
-  const second = openStore({ dataDir })
-  assert.equal(second.schemaVersion, 3)
-  assert.deepEqual(second.readProgress().progress, state)
-  assert.equal(second.hasAccounts(), false)
-  second.close()
-  rmSync(dataDir, { recursive: true, force: true })
+test('conecta ao PostgreSQL e aplica migrations versionadas com constraints e índices', async () => {
+  await withStore(async ({ database, store }) => {
+    assert.equal(await store.checkConnection().then(Boolean), true)
+    assert.equal(store.schemaVersion, SCHEMA_VERSION)
+    assert.equal(store.schemaVersion, 3)
+
+    const pool = new Pool({
+      connectionString: database.connectionString,
+      options: `-c search_path=${database.schema}`,
+    })
+    try {
+      const migrations = await pool.query(
+        'SELECT version, name FROM schema_migrations ORDER BY version',
+      )
+      assert.deepEqual(
+        migrations.rows.map((row) => Number(row.version)),
+        [1, 2, 3],
+      )
+      const tables = await pool.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+         ORDER BY table_name`,
+        [database.schema],
+      )
+      assert.deepEqual(
+        tables.rows.map((row) => row.table_name),
+        [
+          'account_backups',
+          'account_progress',
+          'accounts',
+          'app_meta',
+          'backups',
+          'progress',
+          'schema_migrations',
+          'sessions',
+        ],
+      )
+      const indexes = await pool.query(
+        `SELECT indexname FROM pg_indexes WHERE schemaname = $1`,
+        [database.schema],
+      )
+      assert.ok(indexes.rows.some((row) => row.indexname === 'accounts_username_lower_unique_idx'))
+      assert.ok(indexes.rows.some((row) => row.indexname === 'sessions_expires_idx'))
+      const constraints = await pool.query(
+        `SELECT COUNT(*) AS count FROM pg_constraint c
+         JOIN pg_namespace n ON n.oid = c.connamespace
+         WHERE n.nspname = $1 AND c.contype = 'f'`,
+        [database.schema],
+      )
+      assert.equal(Number(constraints.rows[0].count), 3)
+    } finally {
+      await pool.end()
+    }
+  })
 })
 
-test('rejeita payload inválido sem gravar estado parcial', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    assert.equal(validateProgress({ version: 2 }).ok, false)
-    assert.equal(validateProgress({ version: 1, exercises: {} }).ok, false)
-    assert.throws(() => store.writeProgress({ version: 1 }), /objeto de registros|lista/)
-    assert.equal(store.readProgress(), null)
+test('mantém progresso no PostgreSQL após fechar e reabrir o repositório', async () => {
+  const database = await createIsolatedTestDatabase()
+  const first = await database.openStore()
+  const state = progressFixture()
+  await first.writeProgress(state)
+  assert.deepEqual((await first.readProgress()).progress, state)
+  await first.close()
 
-    const state = progressFixture()
-    store.writeProgress(state)
-    assert.throws(() => store.writeProgress({ ...state, activity: 'invalida' }), /lista/)
-    assert.deepEqual(store.readProgress().progress, state)
+  const second = await database.openStore()
+  try {
+    assert.equal(second.schemaVersion, 3)
+    assert.deepEqual((await second.readProgress()).progress, state)
+    assert.equal(await second.hasAccounts(), false)
   } finally {
-    cleanup()
+    await second.close()
+    await database.cleanup()
   }
 })
 
-test('cadastra conta sem expor segredos e mantém hash scrypt verificável', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const account = register(store, 'ana.local', { expertise: 'intermediario' })
+test('rejeita progresso inválido sem gravar estado parcial', async () => {
+  await withStore(async ({ store }) => {
+    assert.equal(validateProgress({ version: 2 }).ok, false)
+    assert.equal(validateProgress({ version: 1, exercises: {} }).ok, false)
+    await assert.rejects(store.writeProgress({ version: 1 }), { code: 'INVALID_PROGRESS' })
+    assert.equal(await store.readProgress(), null)
+
+    const state = progressFixture()
+    await store.writeProgress(state)
+    await assert.rejects(
+      store.writeProgress({ ...state, activity: 'invalida' }),
+      { code: 'INVALID_PROGRESS' },
+    )
+    assert.deepEqual((await store.readProgress()).progress, state)
+  })
+})
+
+test('cria conta sem e-mail, aplica username case-insensitive e armazena hashes scrypt', async () => {
+  await withStore(async ({ store, database }) => {
+    const account = await register(store, 'ana.local', { expertise: 'intermediario' })
     assert.equal(account.username, 'ana.local')
     assert.equal(account.expertise, 'intermediario')
     assert.equal(account.initialExpertise, 'intermediario')
     assert.equal(account.role, 'admin')
     assert.equal(account.onboardingStatus, 'pending')
-    assert.equal(ONBOARDING_STATUSES.has(account.onboardingStatus), true)
     assert.equal('passwordHash' in account, false)
     assert.equal('recoveryHash' in account, false)
+    assert.equal('email' in account, false)
+    assert.equal(ONBOARDING_STATUSES.has(account.onboardingStatus), true)
 
-    const listed = store.listAccounts()
-    assert.equal(listed.length, 1)
-    assert.equal('passwordHash' in listed[0], false)
+    await assert.rejects(register(store, 'ANA.LOCAL'), { code: 'USERNAME_TAKEN' })
+    assert.equal((await store.listAccounts()).length, 1)
 
-    const secrets = store.getAccountAuthByUsername('ANA.LOCAL')
+    const secrets = await store.getAccountAuthByUsername('ANA.LOCAL')
     assert.match(secrets.passwordHash, /^scrypt\$16384\$8\$1\$/)
     assert.notEqual(secrets.passwordHash, PASSWORD)
     assert.equal(verifyPassword(PASSWORD, secrets.passwordHash), true)
     assert.equal(verifyPassword('senha-errada', secrets.passwordHash), false)
     assert.equal(verifyRecoveryCode(RECOVERY, secrets.recoveryHash), true)
 
-    const reader = new DatabaseSync(store.dbPath, { readOnly: true })
-    const row = reader
-      .prepare('SELECT password_hash, recovery_hash FROM accounts WHERE username = ?')
-      .get('ana.local')
-    reader.close()
-    assert.equal(row.password_hash, secrets.passwordHash)
-    assert.equal(row.recovery_hash, secrets.recoveryHash)
-    assert.equal(row.password_hash.includes(PASSWORD), false)
-    assert.equal(row.recovery_hash.includes(RECOVERY.replace(/-/g, '')), false)
+    const pool = new Pool({
+      connectionString: database.connectionString,
+      options: `-c search_path=${database.schema}`,
+    })
+    try {
+      const row = (
+        await pool.query(
+          'SELECT password_hash, recovery_hash FROM accounts WHERE username = $1',
+          ['ana.local'],
+        )
+      ).rows[0]
+      assert.equal(row.password_hash, secrets.passwordHash)
+      assert.equal(row.recovery_hash, secrets.recoveryHash)
+      assert.equal(row.password_hash.includes(PASSWORD), false)
+      assert.equal(row.recovery_hash.includes(RECOVERY.replace(/-/g, '')), false)
+    } finally {
+      await pool.end()
+    }
+  })
+})
+
+test('não promove automaticamente a primeira conta quando NODE_ENV é production', async () => {
+  const previousNodeEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'production'
+  try {
+    await withStore(async ({ store }) => {
+      const account = await register(store, 'production')
+      assert.equal(account.role, 'member')
+    })
   } finally {
-    cleanup()
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previousNodeEnv
   }
 })
 
-test('isola progresso, backups e sessões entre contas', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const ana = register(store, 'ana')
-    const bruno = register(store, 'bruno', { expertise: 'avancado' })
+test('isola progresso, sessões e backups entre contas; restauração é transacional', async () => {
+  await withStore(async ({ store }) => {
+    const ana = await register(store, 'ana')
+    const bruno = await register(store, 'bruno', { expertise: 'avancado' })
     const anaState = progressFixture('progresso da Ana')
     const brunoState = progressFixture('progresso do Bruno')
-    store.writeAccountProgress(ana.id, anaState)
-    store.writeAccountProgress(bruno.id, brunoState)
+    await store.writeAccountProgress(ana.id, anaState)
+    await store.writeAccountProgress(bruno.id, brunoState)
 
-    assert.deepEqual(store.readAccountProgress(ana.id).progress, anaState)
-    assert.deepEqual(store.readAccountProgress(bruno.id).progress, brunoState)
-    assert.equal(store.readProgress(), null)
+    assert.deepEqual((await store.readAccountProgress(ana.id)).progress, anaState)
+    assert.deepEqual((await store.readAccountProgress(bruno.id)).progress, brunoState)
+    assert.equal(await store.readProgress(), null)
 
-    const backup = store.createAccountBackup(ana.id, 'manual')
+    const backup = await store.createAccountBackup(ana.id, 'manual')
     assert.match(backup.fileName, /^peritsec-ana-/)
-    assert.equal(store.listAccountBackups(ana.id).length, 1)
-    assert.equal(store.listAccountBackups(bruno.id).length, 0)
-    assert.throws(
-      () => store.restoreAccountBackup(bruno.id, backup.id),
-      (error) => error.code === 'BACKUP_NOT_FOUND',
-    )
+    assert.equal((await store.listAccountBackups(ana.id)).length, 1)
+    assert.equal((await store.listAccountBackups(bruno.id)).length, 0)
+    await assert.rejects(store.restoreAccountBackup(bruno.id, backup.id), {
+      code: 'BACKUP_NOT_FOUND',
+    })
 
     const token = generateSessionToken()
     const tokenHash = sessionTokenHash(token)
-    store.createSession(ana.id, tokenHash, sessionExpiry(30))
-    const found = store.findSession(tokenHash)
+    await store.createSession(ana.id, tokenHash, sessionExpiry(30))
+    const found = await store.findSession(tokenHash)
     assert.equal(found.account.id, ana.id)
     assert.equal(found.account.username, 'ana')
     assert.equal(found.tokenHash, tokenHash)
 
-    store.deleteAccountSessions(bruno.id)
-    assert.ok(store.findSession(tokenHash))
-    store.deleteAccountSessions(ana.id)
-    assert.equal(store.findSession(tokenHash), null)
+    await store.deleteAccountSessions(bruno.id)
+    assert.ok(await store.findSession(tokenHash))
+    await store.deleteAccountSessions(ana.id)
+    assert.equal(await store.findSession(tokenHash), null)
 
-    store.updateAccount(ana.id, { expertise: 'avancado' })
-    assert.equal(store.getAccount(ana.id).expertise, 'avancado')
-    assert.deepEqual(store.readAccountProgress(ana.id).progress, anaState)
-    assert.equal(store.listAccountBackups(ana.id).length, 1)
-  } finally {
-    cleanup()
-  }
+    await store.writeAccountProgress(ana.id, progressFixture('versão alterada'))
+    const restored = await store.restoreAccountBackup(ana.id, backup.id)
+    assert.deepEqual(restored.progress, anaState)
+    assert.ok(restored.safetyBackup)
+    assert.match(restored.safetyBackup.fileName, /pre-restauracao/)
+    assert.equal((await store.listAccountBackups(ana.id)).length, 2)
+    assert.deepEqual((await store.readAccountProgress(ana.id)).progress, anaState)
+    assert.deepEqual((await store.readAccountProgress(bruno.id)).progress, brunoState)
+  })
 })
 
-test('sessão expirada é removida e não autentica', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const account = register(store, 'sessao')
-    const token = generateSessionToken()
-    const tokenHash = sessionTokenHash(token)
-    store.createSession(account.id, tokenHash, new Date(Date.now() - 1000).toISOString())
-    assert.equal(store.findSession(tokenHash), null)
-    assert.equal(store.findSession(tokenHash), null)
-  } finally {
-    cleanup()
-  }
+test('remove sessões expiradas e recusa acesso a uma conta excluída por FK', async () => {
+  await withStore(async ({ store, database }) => {
+    const account = await register(store, 'sessao')
+    const tokenHash = sessionTokenHash(generateSessionToken())
+    await store.createSession(account.id, tokenHash, new Date(Date.now() - 1000).toISOString())
+    assert.equal(await store.findSession(tokenHash), null)
+    assert.equal(await store.findSession(tokenHash), null)
+
+    const pool = new Pool({
+      connectionString: database.connectionString,
+      options: `-c search_path=${database.schema}`,
+    })
+    try {
+      await assert.rejects(
+        pool.query(
+          `INSERT INTO sessions (token_hash, account_id, created_at, last_seen_at, expires_at)
+           VALUES ($1, $2, NOW(), NOW(), NOW() + INTERVAL '1 day')`,
+          [sessionTokenHash(generateSessionToken()), 'conta-inexistente'],
+        ),
+        (error) => error.code === '23503',
+      )
+    } finally {
+      await pool.end()
+    }
+  })
 })
 
-test('transições de onboarding preservam datas e não reabrem estado concluído', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const account = register(store, 'onboarding')
-    const started = store.setOnboardingStatus(account.id, 'started')
-    assert.equal(started.onboardingStatus, 'started')
-    assert.ok(started.onboardingStartedAt)
-    assert.equal(started.onboardingCompletedAt, null)
-    const completed = store.setOnboardingStatus(account.id, 'completed')
-    assert.equal(completed.onboardingStatus, 'completed')
-    assert.equal(completed.onboardingStartedAt, started.onboardingStartedAt)
-    assert.ok(completed.onboardingCompletedAt)
-    assert.throws(
-      () => store.setOnboardingStatus(account.id, 'pendente'),
-      (error) => error.code === 'INVALID_ONBOARDING',
-    )
-  } finally {
-    cleanup()
-  }
-})
-
-test('papel administrativo protege o último admin da instalação', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const ana = register(store, 'ana')
-    const bruno = register(store, 'bruno')
+test('preserva transições de onboarding e impede rebaixar o último admin', async () => {
+  await withStore(async ({ store }) => {
+    const ana = await register(store, 'ana')
+    const bruno = await register(store, 'bruno')
     assert.equal(ana.role, 'admin')
     assert.equal(bruno.role, 'member')
-    assert.throws(
-      () => store.setAccountRole(ana.id, 'member'),
-      (error) => error.code === 'LAST_ADMIN',
-    )
+    await assert.rejects(store.setAccountRole(ana.id, 'member'), { code: 'LAST_ADMIN' })
 
-    const promoted = store.setAccountRole(bruno.id, 'admin')
+    const promoted = await store.setAccountRole(bruno.id, 'admin')
     assert.equal(promoted.role, 'admin')
-    const demoted = store.setAccountRole(ana.id, 'member')
+    const demoted = await store.setAccountRole(ana.id, 'member')
     assert.equal(demoted.role, 'member')
-    assert.throws(
-      () => store.setAccountRole(bruno.id, 'member'),
-      (error) => error.code === 'LAST_ADMIN',
-    )
-    assert.throws(
-      () => store.setAccountRole(ana.id, 'proprietario'),
-      (error) => error.code === 'INVALID_ROLE',
-    )
-  } finally {
-    cleanup()
-  }
+    await assert.rejects(store.setAccountRole(bruno.id, 'member'), { code: 'LAST_ADMIN' })
+    await assert.rejects(store.setAccountRole(ana.id, 'proprietario'), {
+      code: 'INVALID_ROLE',
+    })
+
+    const started = await store.setOnboardingStatus(bruno.id, 'started')
+    assert.ok(started.onboardingStartedAt)
+    assert.equal(started.onboardingCompletedAt, null)
+    const completed = await store.setOnboardingStatus(bruno.id, 'completed')
+    assert.equal(completed.onboardingStartedAt, started.onboardingStartedAt)
+    assert.ok(completed.onboardingCompletedAt)
+    await assert.rejects(store.setOnboardingStatus(bruno.id, 'pendente'), {
+      code: 'INVALID_ONBOARDING',
+    })
+  })
 })
 
-test('visão administrativa expõe metadados e contagens, sem segredos', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const ana = register(store, 'ana')
-    const bruno = register(store, 'bruno', { expertise: 'avancado' })
-    store.writeAccountProgress(ana.id, progressFixture('progresso da Ana'))
-    store.createAccountBackup(ana.id, 'manual')
+test('visão administrativa inclui contagens sem hashes ou payload de progresso', async () => {
+  await withStore(async ({ store }) => {
+    const ana = await register(store, 'ana')
+    const bruno = await register(store, 'bruno', { expertise: 'avancado' })
+    await store.writeAccountProgress(ana.id, progressFixture('progresso da Ana'))
+    await store.createAccountBackup(ana.id, 'manual')
 
-    const overview = store.listAccountOverviews()
+    const overview = await store.listAccountOverviews()
     const anaView = overview.find((account) => account.id === ana.id)
     const brunoView = overview.find((account) => account.id === bruno.id)
-
     assert.equal(anaView.role, 'admin')
     assert.equal(anaView.counts.lessons, 1)
     assert.equal(anaView.counts.backups, 1)
     assert.equal(anaView.hasProgress, true)
-    assert.equal(typeof anaView.effectiveExpertise.label, 'string')
     assert.equal(brunoView.role, 'member')
     assert.equal(brunoView.counts.lessons, 0)
     assert.equal(brunoView.hasProgress, false)
@@ -282,127 +368,119 @@ test('visão administrativa expõe metadados e contagens, sem segredos', () => {
     assert.equal(serialized.includes('passwordHash'), false)
     assert.equal(serialized.includes('recoveryHash'), false)
     assert.equal(serialized.includes('scrypt$'), false)
-  } finally {
-    cleanup()
-  }
+    assert.equal(serialized.includes('progresso da Ana'), false)
+  })
 })
 
-test('migra o progresso anônimo uma única vez e de forma idempotente', () => {
-  const { store, cleanup } = createTempStore()
-  try {
+test('importa snapshot SQLite uma vez, preserva identificadores e recusa destinos ocupados', async () => {
+  await withStore(async ({ store }) => {
+    const accountId = randomUUID()
+    const passwordHash = hashPassword(PASSWORD)
+    const recoveryHash = hashRecoveryCode(RECOVERY)
+    const progress = progressFixture('importado')
+    const snapshot = {
+      accounts: [
+        {
+          id: accountId,
+          username: 'importado',
+          display_name: 'Conta Importada',
+          expertise: 'iniciante',
+          initial_expertise: 'iniciante',
+          password_hash: passwordHash,
+          recovery_hash: recoveryHash,
+          onboarding_status: 'started',
+          onboarding_started_at: '2026-10-20T10:00:00.000Z',
+          onboarding_completed_at: null,
+          created_at: '2026-10-20T10:00:00.000Z',
+          updated_at: '2026-10-20T10:00:00.000Z',
+          role: 'admin',
+        },
+      ],
+      sessions: [],
+      progress: [],
+      backups: [],
+      account_progress: [
+        {
+          account_id: accountId,
+          payload: progress,
+          updated_at: '2026-10-20T10:00:00.000Z',
+        },
+      ],
+      account_backups: [],
+      app_meta: [{ key: 'legacy', value: 'preserved' }],
+    }
+    const fingerprint = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex')
+    const imported = await store.importSqliteSnapshot(snapshot, fingerprint)
+    assert.equal(imported.alreadyImported, false)
+    assert.equal(imported.counts.accounts, 1)
+    assert.equal(imported.counts.app_meta, 2)
+    assert.equal((await store.getAccount(accountId)).username, 'importado')
+    assert.deepEqual((await store.readAccountProgress(accountId)).progress, progress)
+    assert.equal(verifyPassword(PASSWORD, (await store.getAccountAuthById(accountId)).passwordHash), true)
+
+    const repeated = await store.importSqliteSnapshot(snapshot, fingerprint)
+    assert.equal(repeated.alreadyImported, true)
+    await assert.rejects(
+      store.importSqliteSnapshot(snapshot, '0'.repeat(64)),
+      { code: 'IMPORT_ALREADY_COMPLETED' },
+    )
+  })
+})
+
+test('não importa um snapshot SQLite por cima de dados PostgreSQL existentes', async () => {
+  await withStore(async ({ store }) => {
+    await register(store, 'existente')
+    const snapshot = {
+      accounts: [],
+      sessions: [],
+      progress: [],
+      backups: [],
+      account_progress: [],
+      account_backups: [],
+      app_meta: [],
+    }
+    const fingerprint = createHash('sha256').update(JSON.stringify(snapshot)).digest('hex')
+    await assert.rejects(store.importSqliteSnapshot(snapshot, fingerprint), {
+      code: 'IMPORT_TARGET_NOT_EMPTY',
+    })
+    assert.equal((await store.listAccounts()).length, 1)
+  })
+})
+
+test('migra progresso anônimo uma única vez e recusa sobrescrever histórico próprio', async () => {
+  await withStore(async ({ store }) => {
     const legacy = progressFixture('progresso anterior')
-    store.writeProgress(legacy)
-    assert.deepEqual(store.getAnonymousProgressStatus(), {
+    await store.writeProgress(legacy)
+    const withOwnProgress = await register(store, 'com-historico')
+    await store.writeAccountProgress(withOwnProgress.id, progressFixture('próprio'))
+    await assert.rejects(store.claimAnonymousProgress(withOwnProgress.id), {
+      code: 'ACCOUNT_PROGRESS_EXISTS',
+    })
+    assert.deepEqual(await store.getAnonymousProgressStatus(), {
       hasAnonymousProgress: true,
       migrated: false,
       migratedTo: null,
     })
 
-    const ana = register(store, 'ana', { migrateAnonymous: true })
+    const ana = await register(store, 'ana', { migrateAnonymous: true })
     assert.equal(ana.onboardingStatus, 'completed')
     assert.ok(ana.onboardingCompletedAt)
-    assert.deepEqual(store.readAccountProgress(ana.id).progress, legacy)
-    assert.deepEqual(store.getAnonymousProgressStatus(), {
+    assert.deepEqual((await store.readAccountProgress(ana.id)).progress, legacy)
+    assert.deepEqual(await store.getAnonymousProgressStatus(), {
       hasAnonymousProgress: false,
       migrated: true,
       migratedTo: ana.id,
     })
 
-    const repeated = store.claimAnonymousProgress(ana.id)
+    const repeated = await store.claimAnonymousProgress(ana.id)
     assert.equal(repeated.alreadyMigrated, true)
-    assert.deepEqual(repeated.progress, legacy)
-    assert.deepEqual(store.readAccountProgress(ana.id).progress, legacy)
-
-    const bruno = register(store, 'bruno')
-    assert.throws(
-      () => store.claimAnonymousProgress(bruno.id),
-      (error) => error.code === 'ANONYMOUS_ALREADY_MIGRATED',
-    )
-    assert.throws(
-      () => register(store, 'carla', { migrateAnonymous: true }),
-      (error) => error.code === 'ANONYMOUS_PROGRESS_UNAVAILABLE',
-    )
-    assert.equal(store.readAccountProgress(bruno.id), null)
-    assert.equal(store.listAccounts().length, 2)
-  } finally {
-    cleanup()
-  }
-})
-
-test('não importa progresso anônimo sobre conta que já possui histórico', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    store.writeProgress(progressFixture('anterior'))
-    const account = register(store, 'com-historico')
-    store.writeAccountProgress(account.id, progressFixture('próprio'))
-    assert.throws(
-      () => store.claimAnonymousProgress(account.id),
-      (error) => error.code === 'ACCOUNT_PROGRESS_EXISTS',
-    )
-    assert.equal(store.getAnonymousProgressStatus().migrated, false)
-    assert.equal(store.readAccountProgress(account.id).progress.activity[0].label, 'próprio')
-  } finally {
-    cleanup()
-  }
-})
-
-test('cria backup por conta, restaura com segurança prévia e detecta adulteração', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const account = register(store, 'backup')
-    const original = progressFixture('versão original')
-    store.writeAccountProgress(account.id, original)
-    const backup = store.createAccountBackup(account.id, 'manual')
-    assert.ok(backup.id > 0)
-    assert.equal(backup.sha256.length, 64)
-    assert.match(backup.fileName, /^peritsec-backup-/)
-
-    const onDisk = JSON.parse(readFileSync(join(store.backupDir, backup.fileName), 'utf8'))
-    assert.equal(onDisk.app, 'PeritSec')
-    assert.equal(onDisk.accountId, account.id)
-    assert.deepEqual(onDisk.progress, original)
-
-    store.writeAccountProgress(account.id, progressFixture('versão alterada'))
-    assert.equal(
-      store.readAccountProgress(account.id).progress.activity[0].label,
-      'versão alterada',
-    )
-
-    const restored = store.restoreAccountBackup(account.id, backup.id)
-    assert.deepEqual(restored.progress, original)
-    assert.equal(restored.restoredFrom.id, backup.id)
-    assert.ok(restored.safetyBackup)
-    assert.match(restored.safetyBackup.fileName, /pre-restauracao/)
-    assert.equal(store.listAccountBackups(account.id).length, 2)
-    assert.deepEqual(store.readAccountProgress(account.id).progress, original)
-
-    const filePath = join(store.backupDir, backup.fileName)
-    const tampered = readFileSync(filePath, 'utf8').replace('versão original', 'versão adulterada')
-    writeFileSync(filePath, tampered, 'utf8')
-    assert.throws(
-      () => store.restoreAccountBackup(account.id, backup.id),
-      (error) => error.code === 'BACKUP_HASH_MISMATCH',
-    )
-  } finally {
-    cleanup()
-  }
-})
-
-test('informa ausência de progresso de conta e de backup', () => {
-  const { store, cleanup } = createTempStore()
-  try {
-    const account = register(store, 'vazia')
-    assert.throws(
-      () => store.createAccountBackup(account.id, 'manual'),
-      (error) => error.code === 'EMPTY_PROGRESS',
-    )
-    assert.throws(
-      () => store.restoreAccountBackup(account.id, 999),
-      (error) => error.code === 'BACKUP_NOT_FOUND',
-    )
-    assert.deepEqual(store.listAccountBackups(account.id), [])
-    assert.equal(store.getAccount('inexistente'), null)
-  } finally {
-    cleanup()
-  }
+    const bruno = await register(store, 'bruno')
+    await assert.rejects(store.claimAnonymousProgress(bruno.id), {
+      code: 'ANONYMOUS_ALREADY_MIGRATED',
+    })
+    await assert.rejects(register(store, 'carla', { migrateAnonymous: true }), {
+      code: 'ANONYMOUS_PROGRESS_UNAVAILABLE',
+    })
+    assert.equal(await store.readAccountProgress(bruno.id), null)
+  })
 })

@@ -294,7 +294,7 @@ export function AccountPage() {
               </div>
               <div>
                 <dt>Armazenamento</dt>
-                <dd>SQLite local · dados separados por conta</dd>
+                <dd>PostgreSQL local · dados separados por conta</dd>
               </div>
               <div>
                 <dt>Nível efetivo</dt>

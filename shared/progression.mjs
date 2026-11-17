@@ -2,7 +2,7 @@
  * Fonte única das regras educacionais do PeritSec.
  *
  * Este módulo é consumido pelo frontend (Vite) e pelo servidor local (Node).
- * Ele não contém JSX, DOM, SQLite ou qualquer dependência de interface.
+ * Ele não contém JSX, DOM, código de banco de dados ou dependência de interface.
  *
  * Vocabulário:
  * - nível inicial: escolha feita no cadastro, que orienta o ponto de partida;

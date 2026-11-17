@@ -1,13 +1,10 @@
 import test, { after, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { openStore } from './db.mjs'
+import { resolve } from 'node:path'
+import { createIsolatedTestDatabase } from './test-utils.mjs'
 
 const PROJECT_DIR = resolve(import.meta.dirname, '..')
-const DATA_DIR = mkdtempSync(join(tmpdir(), 'peritsec-api-'))
 const PASSWORD = 'SenhaLocal#2026'
 const NEW_PASSWORD = 'OutraSenhaLocal#2026'
 const LEGACY_LABEL = 'progresso anônimo anterior'
@@ -22,6 +19,7 @@ let anaBackup
 let brunoProgress
 let membroClient
 let membroAccountId
+let testDatabase
 
 function fixture(label = 'estado inicial') {
   return {
@@ -186,7 +184,9 @@ function startServer() {
       cwd: PROJECT_DIR,
       env: {
         ...process.env,
-        PERITSEC_DATA_DIR: DATA_DIR,
+        DATABASE_URL: testDatabase.connectionString,
+        PERITSEC_DB_SCHEMA: testDatabase.schema,
+        PERITSEC_DATA_DIR: testDatabase.dataDir,
         PERITSEC_SECURE_COOKIE: '0',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -222,10 +222,25 @@ function startServer() {
   })
 }
 
+async function stopServer() {
+  const running = child
+  child = null
+  if (!running || running.exitCode !== null) return
+  await new Promise((resolvePromise) => {
+    const timer = setTimeout(resolvePromise, 5000)
+    running.once('exit', () => {
+      clearTimeout(timer)
+      resolvePromise()
+    })
+    running.kill('SIGTERM')
+  })
+}
+
 before(async () => {
-  const seed = openStore({ dataDir: DATA_DIR })
-  seed.writeProgress(legacyFixture())
-  seed.close()
+  testDatabase = await createIsolatedTestDatabase()
+  const seed = await testDatabase.openStore()
+  await seed.writeProgress(legacyFixture())
+  await seed.close()
 
   const started = await startServer()
   child = started.processChild
@@ -233,24 +248,19 @@ before(async () => {
 })
 
 after(async () => {
-  if (child && child.exitCode === null) {
-    child.kill('SIGTERM')
-    await new Promise((resolvePromise) => {
-      child.once('exit', resolvePromise)
-      setTimeout(resolvePromise, 3000)
-    })
-  }
-  rmSync(DATA_DIR, { recursive: true, force: true })
+  await stopServer()
+  if (testDatabase) await testDatabase.cleanup()
 })
 
-test('health, setup e barreiras iniciais refletem SQLite v3 e progresso legado', async () => {
+test('health, setup e barreiras iniciais refletem PostgreSQL v3 e progresso legado', async () => {
   const health = await fetch(`${baseUrl}/api/health`)
   assert.equal(health.status, 200)
   const healthBody = await health.json()
   assert.equal(healthBody.ok, true)
-  assert.equal(healthBody.storage, 'sqlite')
+  assert.equal(healthBody.storage, 'postgresql')
   assert.equal(healthBody.schemaVersion, 3)
-  assert.equal(healthBody.dataDir, DATA_DIR)
+  assert.equal(healthBody.dataDir, testDatabase.dataDir)
+  assert.equal(typeof healthBody.databaseVersion, 'string')
 
   const setup = await fetch(`${baseUrl}/api/setup`)
   assert.equal(setup.status, 200)
@@ -293,6 +303,7 @@ test('cadastro, onboarding, progresso e bloqueios reais funcionam por conta', as
   assert.match(registered.setCookie, /SameSite=Strict/)
   assert.match(registered.setCookie, /Max-Age=\d+/)
   assert.equal(registered.data.account.username, 'ana.local')
+  assert.equal('email' in registered.data.account, false)
   assert.equal(registered.data.account.onboardingStatus, 'pending')
   assert.equal(registered.data.account.effectiveExpertise.id, 'iniciante')
   assert.equal(registered.data.account.hasProgress, false)
@@ -342,7 +353,7 @@ test('cadastro, onboarding, progresso e bloqueios reais funcionam por conta', as
   assert.equal(session.status, 200)
   assert.equal(session.data.account.onboardingStatus, 'pending')
   assert.equal(session.data.anonymousProgressAvailable, true)
-  assert.equal(session.data.dataDir, DATA_DIR)
+  assert.equal(session.data.dataDir, testDatabase.dataDir)
 
   const started = await anaClient.post('/api/onboarding', { status: 'started' })
   assert.equal(started.status, 200)
@@ -395,7 +406,7 @@ test('cadastro, onboarding, progresso e bloqueios reais funcionam por conta', as
   const reopened = await anaClient.get('/api/progress')
   assert.equal(reopened.status, 200)
   assert.deepEqual(reopened.data.progress, withFirstLesson)
-  assert.equal(reopened.data.dataDir, DATA_DIR)
+  assert.equal(reopened.data.dataDir, testDatabase.dataDir)
 
   const completedAgain = await anaClient.post('/api/onboarding', { status: 'started' })
   assert.equal(completedAgain.status, 200)
@@ -853,4 +864,31 @@ test('logout, CSRF local, CORS e rotas desconhecidas continuam restritos', async
   const rootBody = await root.json()
   assert.equal(rootBody.app, 'PeritSec')
   assert.equal(rootBody.health, '/api/health')
+})
+
+test('conta, sessão e progresso continuam disponíveis após reiniciar o backend', async () => {
+  const persistentClient = new ApiClient('persistente')
+  const registered = await persistentClient.register(
+    registration('persistente', { displayName: 'Conta Persistente' }),
+  )
+  assert.equal(registered.status, 201)
+  const accountId = registered.data.account.id
+  const state = addLesson(fixture('persistência PostgreSQL'), 'caminho-do-pacote', 'lição persistida')
+  const saved = await persistentClient.put('/api/progress', {
+    accountId,
+    progress: state,
+  })
+  assert.equal(saved.status, 200)
+
+  await stopServer()
+  const restarted = await startServer()
+  child = restarted.processChild
+  baseUrl = `http://127.0.0.1:${restarted.port}`
+
+  const session = await persistentClient.get('/api/auth/session')
+  assert.equal(session.status, 200)
+  assert.equal(session.data.account.id, accountId)
+  const progress = await persistentClient.get('/api/progress')
+  assert.equal(progress.status, 200)
+  assert.deepEqual(progress.data.progress, state)
 })

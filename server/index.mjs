@@ -70,7 +70,17 @@ const serveStatic = process.argv.includes('--serve')
 const portArg = process.argv.find((argument) => argument.startsWith('--port='))
 const port = parsePort(portArg?.split('=')[1] ?? process.env.PORT, serveStatic ? 4173 : 4317)
 
-const store = openStore()
+let store
+try {
+  store = await openStore()
+} catch (error) {
+  const detail =
+    error?.code === 'DATABASE_URL_REQUIRED' || error?.code === 'DATABASE_UNAVAILABLE'
+      ? error.message
+      : `código ${error?.code ?? 'UNKNOWN'}`
+  console.error(`[peritsec] não foi possível iniciar a persistência PostgreSQL: ${detail}`)
+  process.exit(1)
+}
 const startedAt = new Date().toISOString()
 const loginLimiter = createRateLimiter({ limit: 8, windowMs: 5 * 60_000 })
 const recoveryLimiter = createRateLimiter({ limit: 5, windowMs: 10 * 60_000 })
@@ -188,6 +198,8 @@ function errorStatus(error) {
       return 404
     case 'LAST_ADMIN':
       return 409
+    case 'DATABASE_UNAVAILABLE':
+      return 503
     default:
       return 500
   }
@@ -230,6 +242,9 @@ function errorMessage(error) {
   if (error?.code === 'INVALID_ROLE') {
     return 'Papel de conta inválido.'
   }
+  if (error?.code === 'DATABASE_UNAVAILABLE') {
+    return 'O PostgreSQL local está indisponível. Inicie o banco e tente novamente.'
+  }
   return error?.message || 'Erro interno no servidor local.'
 }
 
@@ -259,37 +274,40 @@ function sessionPayload(session, account, progress) {
   }
 }
 
-function createSessionFor(accountId) {
+function createSessionCredentials() {
   const token = generateSessionToken()
   const tokenHash = sessionTokenHash(token)
   const expiresAt = sessionExpiry()
-  store.deleteExpiredSessions()
-  store.createSession(accountId, tokenHash, expiresAt)
-  return { token, expiresAt }
+  return { token, tokenHash, expiresAt }
 }
 
-function getAuthenticated(request) {
+async function createSessionFor(accountId) {
+  const credentials = createSessionCredentials()
+  await store.createSession(accountId, credentials.tokenHash, credentials.expiresAt)
+  return credentials
+}
+
+async function getAuthenticated(request) {
   const cookies = parseCookies(request.headers.cookie)
   const token = cookies[SESSION_COOKIE]
   if (!token) return null
   const tokenHash = sessionTokenHash(token)
-  const session = store.findSession(tokenHash)
+  const session = await store.findSession(tokenHash)
   if (!session) return null
-  store.touchSession(tokenHash)
   let account = session.account
-  const progress = store.readAccountProgress(account.id)
+  const progress = await store.readAccountProgress(account.id)
   if (
     progress &&
     progressHasEvidence(progress.progress) &&
     account.onboardingStatus !== 'completed'
   ) {
-    account = store.setOnboardingStatus(account.id, 'completed')
+    account = await store.setOnboardingStatus(account.id, 'completed')
   }
   return { token, tokenHash, session, account, progress }
 }
 
-function requireAuth(request, response) {
-  const auth = getAuthenticated(request)
+async function requireAuth(request, response) {
+  const auth = await getAuthenticated(request)
   if (!auth) {
     sendJson(response, 401, {
       error: 'Sessão expirada ou inválida. Entre novamente.',
@@ -304,8 +322,8 @@ function requireAuth(request, response) {
  * Autorização administrativa verificada no servidor. Esconder o link no
  * frontend não substitui esta checagem.
  */
-function requireAdmin(request, response) {
-  const auth = requireAuth(request, response)
+async function requireAdmin(request, response) {
+  const auth = await requireAuth(request, response)
   if (!auth) return null
   if (auth.account.role !== 'admin') {
     sendJson(response, 403, {
@@ -332,24 +350,35 @@ async function handleApi(request, response, url) {
   const method = request.method ?? 'GET'
 
   if (pathname === '/api/health' && method === 'GET') {
-    sendJson(response, 200, {
-      ok: true,
-      app: APP_NAME,
-      storage: 'sqlite',
-      schemaVersion: store.schemaVersion,
-      dataDir: store.dataDir,
-      dbPath: store.dbPath,
-      startedAt,
-      uptimeSeconds: Math.round(process.uptime()),
-    })
+    try {
+      const databaseVersion = await store.checkConnection()
+      sendJson(response, 200, {
+        ok: true,
+        app: APP_NAME,
+        storage: 'postgresql',
+        schemaVersion: store.schemaVersion,
+        databaseVersion,
+        dataDir: store.dataDir,
+        backupDir: store.backupDir,
+        startedAt,
+        uptimeSeconds: Math.round(process.uptime()),
+      })
+    } catch (error) {
+      sendJson(response, errorStatus(error), {
+        ok: false,
+        app: APP_NAME,
+        storage: 'postgresql',
+        error: errorMessage(error),
+      })
+    }
     return true
   }
 
   if (pathname === '/api/setup' && method === 'GET') {
-    const anonymous = store.getAnonymousProgressStatus()
+    const anonymous = await store.getAnonymousProgressStatus()
     sendJson(response, 200, {
       app: APP_NAME,
-      hasAccounts: store.hasAccounts(),
+      hasAccounts: await store.hasAccounts(),
       hasAnonymousProgress: anonymous.hasAnonymousProgress,
       anonymousProgressMigrated: anonymous.migrated,
       sessionPolicy: SESSION_POLICY,
@@ -369,7 +398,8 @@ async function handleApi(request, response, url) {
     }
     try {
       const recoveryCode = generateRecoveryCode()
-      const account = store.registerAccount({
+      const session = createSessionCredentials()
+      const account = await store.registerAccount({
         displayName: validation.displayName,
         username: validation.username,
         passwordHash: hashPassword(validation.password),
@@ -378,15 +408,14 @@ async function handleApi(request, response, url) {
         initialExpertise: validation.expertise,
         onboardingStatus: 'pending',
         migrateAnonymous: Boolean(body.migrateAnonymousProgress),
+        session: { tokenHash: session.tokenHash, expiresAt: session.expiresAt },
       })
-      const progress = store.readAccountProgress(account.id)
-      const session = createSessionFor(account.id)
-      const updatedAccount = store.getAccount(account.id)
+      const progress = await store.readAccountProgress(account.id)
       sendJson(
         response,
         201,
         {
-          ...sessionPayload(session, updatedAccount, progress),
+          ...sessionPayload(session, account, progress),
           recoveryCode,
           recoveryNotice:
             'Guarde este código. Ele é exibido uma única vez e permite redefinir a senha sem e-mail.',
@@ -418,17 +447,16 @@ async function handleApi(request, response, url) {
       )
       return true
     }
-    const accountWithSecrets = store.getAccountAuthByUsername(username.username)
+    const accountWithSecrets = await store.getAccountAuthByUsername(username.username)
     if (!accountWithSecrets || !verifyPassword(body.password, accountWithSecrets.passwordHash)) {
       loginLimiter.fail(key)
       sendJson(response, 401, { error: 'Usuário ou senha inválidos.' })
       return true
     }
     loginLimiter.reset(key)
-    store.deleteExpiredSessions()
-    const session = createSessionFor(accountWithSecrets.id)
-    const account = store.getAccount(accountWithSecrets.id)
-    const progress = store.readAccountProgress(account.id)
+    const session = await createSessionFor(accountWithSecrets.id)
+    const account = await store.getAccount(accountWithSecrets.id)
+    const progress = await store.readAccountProgress(account.id)
     sendJson(
       response,
       200,
@@ -441,16 +469,16 @@ async function handleApi(request, response, url) {
   if (pathname === '/api/auth/logout' && method === 'POST') {
     const cookies = parseCookies(request.headers.cookie)
     const token = cookies[SESSION_COOKIE]
-    if (token) store.deleteSession(sessionTokenHash(token))
+    if (token) await store.deleteSession(sessionTokenHash(token))
     sendJson(response, 200, { ok: true }, { 'Set-Cookie': clearSessionCookie() })
     return true
   }
 
   if (pathname === '/api/auth/session' && method === 'GET') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
-    const anonymous = store.getAnonymousProgressStatus()
-    const progress = store.readAccountProgress(auth.account.id)
+    const anonymous = await store.getAnonymousProgressStatus()
+    const progress = await store.readAccountProgress(auth.account.id)
     sendJson(response, 200, {
       ...sessionPayload(auth.session, auth.account, progress),
       anonymousProgressAvailable: anonymous.hasAnonymousProgress,
@@ -491,7 +519,7 @@ async function handleApi(request, response, url) {
       )
       return true
     }
-    const accountWithSecrets = store.getAccountAuthByUsername(username.username)
+    const accountWithSecrets = await store.getAccountAuthByUsername(username.username)
     if (!accountWithSecrets || !verifyRecoveryCode(code, accountWithSecrets.recoveryHash)) {
       recoveryLimiter.fail(key)
       sendJson(response, 401, { error: 'Usuário ou código de recuperação inválidos.' })
@@ -499,11 +527,10 @@ async function handleApi(request, response, url) {
     }
     recoveryLimiter.reset(key)
     const newRecoveryCode = generateRecoveryCode()
-    store.updateAccountSecrets(accountWithSecrets.id, {
+    await store.updateAccountSecrets(accountWithSecrets.id, {
       passwordHash: hashPassword(password.password),
       recoveryHash: hashRecoveryCode(newRecoveryCode),
     })
-    store.deleteAccountSessions(accountWithSecrets.id)
     sendJson(response, 200, {
       ok: true,
       recoveryCode: newRecoveryCode,
@@ -513,7 +540,7 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/account' && method === 'PATCH') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     const body = await readJsonBody(request, response)
     if (!body) return true
@@ -534,11 +561,11 @@ async function handleApi(request, response, url) {
       return true
     }
     try {
-      const account = store.updateAccount(auth.account.id, {
+      const account = await store.updateAccount(auth.account.id, {
         displayName: displayName.displayName,
         expertise: expertise.expertise,
       })
-      const progress = store.readAccountProgress(auth.account.id)
+      const progress = await store.readAccountProgress(auth.account.id)
       sendJson(response, 200, sessionPayload(auth.session, account, progress))
     } catch (error) {
       sendJson(response, errorStatus(error), { error: errorMessage(error), code: error?.code })
@@ -547,10 +574,10 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/account/recovery-code' && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     const recoveryCode = generateRecoveryCode()
-    store.setRecoveryHash(auth.account.id, hashRecoveryCode(recoveryCode))
+    await store.setRecoveryHash(auth.account.id, hashRecoveryCode(recoveryCode))
     sendJson(response, 200, {
       ok: true,
       recoveryCode,
@@ -561,7 +588,7 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/onboarding' && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     const body = await readJsonBody(request, response)
     if (!body) return true
@@ -574,17 +601,17 @@ async function handleApi(request, response, url) {
       sendJson(response, 200, sessionPayload(auth.session, auth.account, auth.progress))
       return true
     }
-    const account = store.setOnboardingStatus(auth.account.id, status)
+    const account = await store.setOnboardingStatus(auth.account.id, status)
     sendJson(response, 200, sessionPayload(auth.session, account, auth.progress))
     return true
   }
 
   if (pathname === '/api/account/import-anonymous' && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     try {
-      const imported = store.claimAnonymousProgress(auth.account.id)
-      const account = store.getAccount(auth.account.id)
+      const imported = await store.claimAnonymousProgress(auth.account.id)
+      const account = await store.getAccount(auth.account.id)
       sendJson(response, 200, {
         ok: true,
         progress: imported.progress,
@@ -599,7 +626,7 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/progress' && method === 'GET') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     const current = auth.progress
     if (!current) {
@@ -615,7 +642,7 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/progress' && method === 'PUT') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     const body = await readJsonBody(request, response)
     if (!body) return true
@@ -644,13 +671,10 @@ async function handleApi(request, response, url) {
       return true
     }
     try {
-      const { updatedAt } = store.writeAccountProgress(auth.account.id, body.progress)
-      if (
-        auth.account.onboardingStatus !== 'completed' &&
-        progressHasEvidence(body.progress)
-      ) {
-        store.setOnboardingStatus(auth.account.id, 'completed')
-      }
+      const { updatedAt } = await store.saveAccountProgress(auth.account.id, body.progress, {
+        completeOnboarding:
+          auth.account.onboardingStatus !== 'completed' && progressHasEvidence(body.progress),
+      })
       sendJson(response, 200, { ok: true, updatedAt, dataDir: store.dataDir })
     } catch (error) {
       sendJson(response, errorStatus(error), { error: errorMessage(error), code: error?.code })
@@ -659,9 +683,9 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/admin/overview' && method === 'GET') {
-    const auth = requireAdmin(request, response)
+    const auth = await requireAdmin(request, response)
     if (!auth) return true
-    const accounts = store.listAccountOverviews()
+    const accounts = await store.listAccountOverviews()
     const content = Object.values(CONTENT_RULES)
     sendJson(response, 200, {
       ok: true,
@@ -685,15 +709,16 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/admin/elevate' && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     try {
       const alreadyAdmin = auth.account.role === 'admin'
-      const updated = store.setAccountRole(auth.account.id, 'admin')
+      const updated = await store.setAccountRole(auth.account.id, 'admin')
+      const progress = await store.readAccountProgress(auth.account.id)
       sendJson(response, 200, {
         ok: true,
         alreadyAdmin,
-        account: publicAccount(updated, store.readAccountProgress(auth.account.id)),
+        account: publicAccount(updated, progress),
       })
     } catch (error) {
       sendJson(response, errorStatus(error), { error: errorMessage(error), code: error?.code })
@@ -703,7 +728,7 @@ async function handleApi(request, response, url) {
 
   const adminRoleMatch = pathname.match(/^\/api\/admin\/accounts\/([^/]+)\/role$/)
   if (adminRoleMatch && method === 'PATCH') {
-    const auth = requireAdmin(request, response)
+    const auth = await requireAdmin(request, response)
     if (!auth) return true
     const body = await readJsonBody(request, response)
     if (!body) return true
@@ -712,8 +737,9 @@ async function handleApi(request, response, url) {
       return true
     }
     try {
-      const updated = store.setAccountRole(decodeURIComponent(adminRoleMatch[1]), body.role)
-      const overview = store.listAccountOverviews().find((account) => account.id === updated.id)
+      const updated = await store.setAccountRole(decodeURIComponent(adminRoleMatch[1]), body.role)
+      const overviews = await store.listAccountOverviews()
+      const overview = overviews.find((account) => account.id === updated.id)
       sendJson(response, 200, { ok: true, account: overview })
     } catch (error) {
       sendJson(response, errorStatus(error), { error: errorMessage(error), code: error?.code })
@@ -722,17 +748,17 @@ async function handleApi(request, response, url) {
   }
 
   if (pathname === '/api/backups' && method === 'GET') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
-    sendJson(response, 200, { backups: store.listAccountBackups(auth.account.id) })
+    sendJson(response, 200, { backups: await store.listAccountBackups(auth.account.id) })
     return true
   }
 
   if (pathname === '/api/backups' && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     try {
-      const backup = store.createAccountBackup(auth.account.id, 'manual')
+      const backup = await store.createAccountBackup(auth.account.id, 'manual')
       sendJson(response, 201, { ok: true, backup })
     } catch (error) {
       sendJson(response, errorStatus(error), { error: errorMessage(error), code: error?.code })
@@ -742,10 +768,10 @@ async function handleApi(request, response, url) {
 
   const restoreMatch = pathname.match(/^\/api\/backups\/(\d+)\/restore$/)
   if (restoreMatch && method === 'POST') {
-    const auth = requireAuth(request, response)
+    const auth = await requireAuth(request, response)
     if (!auth) return true
     try {
-      const restored = store.restoreAccountBackup(auth.account.id, Number(restoreMatch[1]))
+      const restored = await store.restoreAccountBackup(auth.account.id, Number(restoreMatch[1]))
       sendJson(response, 200, {
         ok: true,
         progress: restored.progress,
@@ -886,29 +912,38 @@ const server = createServer(async (request, response) => {
 
     handleStatic(request, response, url)
   } catch (error) {
-    console.error('[peritsec] erro não tratado:', error?.message ?? error)
-    sendJson(response, 500, { error: 'erro interno no servidor local' })
+    console.error(`[peritsec] erro não tratado (${error?.code ?? 'INTERNAL_ERROR'})`)
+    sendJson(response, errorStatus(error), {
+      error: errorMessage(error),
+      ...(error?.code ? { code: error.code } : {}),
+    })
   }
 })
 
 server.listen(port, BIND_HOST, () => {
   const actualPort = server.address()?.port ?? port
   console.log(`[peritsec] API ${process.env.RENDER === 'true' ? 'publicada' : 'local'} em http://${BIND_HOST}:${actualPort}`)
-  console.log(`[peritsec] dados em ${store.dataDir}`)
-  console.log(`[peritsec] SQLite schema v${store.schemaVersion}`)
+  console.log(`[peritsec] PostgreSQL schema v${store.schemaVersion}`)
+  console.log(`[peritsec] arquivos de backup em ${store.backupDir}`)
   if (serveStatic) console.log('[peritsec] servindo dist/ para uso offline')
 })
 
+let shuttingDown = false
 function shutdown(signal) {
+  if (shuttingDown) return
+  shuttingDown = true
   console.log(`[peritsec] encerrando (${signal})`)
+  const timeout = setTimeout(() => {
+    void store.close().finally(() => process.exit(1))
+  }, 4000)
+  timeout.unref()
   server.close(() => {
-    store.close()
-    process.exit(0)
+    clearTimeout(timeout)
+    void store.close().then(
+      () => process.exit(0),
+      () => process.exit(1),
+    )
   })
-  setTimeout(() => {
-    store.close()
-    process.exit(1)
-  }, 4000).unref()
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'))
@@ -922,6 +957,5 @@ server.on('error', (error) => {
   } else {
     console.error('[peritsec] falha ao iniciar:', error)
   }
-  store.close()
-  process.exit(1)
+  void store.close().finally(() => process.exit(1))
 })

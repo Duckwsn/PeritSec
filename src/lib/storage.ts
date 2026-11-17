@@ -1,6 +1,6 @@
 import { sanitizeProgress, type ProgressState } from './progress'
 
-export type StorageMode = 'checking' | 'sqlite' | 'local'
+export type StorageMode = 'checking' | 'postgresql' | 'unavailable'
 
 export interface BackupSummary {
   id: number

@@ -229,7 +229,7 @@ export function AdminPage() {
               <ShieldCheck size={14} aria-hidden="true" />
               Acesso administrativo
             </span>
-            <span className="meta-item">SQLite schema v{overview?.schemaVersion ?? 3}</span>
+            <span className="meta-item">PostgreSQL schema v{overview?.schemaVersion ?? 3}</span>
             <span className="meta-item">
               {overview ? `${overview.accountCount} contas · ${overview.adminCount} administrador` : 'Carregando contas…'}
             </span>
@@ -486,7 +486,7 @@ export function AdminPage() {
           <dl className="account-facts">
             <div>
               <dt>Armazenamento</dt>
-              <dd>SQLite local · schema v{overview?.schemaVersion ?? 3}</dd>
+              <dd>PostgreSQL local · schema v{overview?.schemaVersion ?? 3}</dd>
             </div>
             <div>
               <dt>Contas</dt>

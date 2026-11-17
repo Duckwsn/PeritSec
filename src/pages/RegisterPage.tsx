@@ -104,7 +104,7 @@ export function RegisterPage() {
           <div className="auth-page__note">
             <Database size={18} aria-hidden="true" />
             <p>
-              Tudo é gravado no SQLite desta instalação. Não há e-mail, telefone, OAuth ou envio de
+              Tudo é gravado no PostgreSQL desta instalação. Não há e-mail, telefone, OAuth ou envio de
               dados para serviços externos.
             </p>
           </div>
