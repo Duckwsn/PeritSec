@@ -170,10 +170,10 @@ export function TracksPage() {
             <p>O caso pontua causa, evidências, hipóteses, linha do tempo e limites.</p>
           </div>
           <div>
-            <h3>Registro local por conta</h3>
+            <h3>Registro por conta</h3>
             <p>
-              O histórico permanece neste dispositivo, no PostgreSQL local, separado por conta, e pode ser
-              copiado na página de progresso.
+              O histórico fica associado à sua conta, separado por usuário, e pode ser copiado na
+              página de progresso.
             </p>
           </div>
         </div>

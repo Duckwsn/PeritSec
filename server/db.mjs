@@ -757,7 +757,7 @@ export async function openStore({
         if (Number(count.rows[0].count) <= 1) {
           throw domainError(
             'LAST_ADMIN',
-            'a instalação precisa de pelo menos uma conta administradora',
+            'a plataforma precisa de pelo menos uma conta administradora',
           )
         }
       }

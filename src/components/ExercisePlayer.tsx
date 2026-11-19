@@ -21,6 +21,8 @@ const KIND_LABEL: Record<Exercise['kind'], string> = {
   subnet: 'Cálculo de sub-rede',
   order: 'Ordenação',
   multi: 'Seleção múltipla',
+  classify: 'Classificação',
+  match: 'Correspondência',
 }
 
 const DIFFICULTY_LABEL: Record<Exercise['difficulty'], string> = {
@@ -76,6 +78,82 @@ function ResultDetails({ details }: { details: ResultDetail[] }) {
         </li>
       ))}
     </ul>
+  )
+}
+
+function ExerciseBriefing({ exercise }: { exercise: Exercise }) {
+  const hasBriefing = Boolean(
+    exercise.knowledge?.length ||
+      exercise.support ||
+      exercise.challenge ||
+      exercise.steps?.length ||
+      exercise.evidence ||
+      exercise.criteria?.length,
+  )
+  if (!hasBriefing) return null
+  return (
+    <section className="exercise-briefing" aria-label="Briefing da atividade">
+      <div className="exercise-briefing__head">
+        <span className="mono">Briefing</span>
+        <p>O que você precisa mobilizar, registrar e sustentar nesta atividade.</p>
+      </div>
+      <dl className="exercise-briefing__grid">
+        {exercise.knowledge && exercise.knowledge.length > 0 && (
+          <div>
+            <dt>Conhecimentos</dt>
+            <dd>
+              <ul>
+                {exercise.knowledge.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+        {exercise.support && (
+          <div>
+            <dt>Apoio</dt>
+            <dd>{exercise.support}</dd>
+          </div>
+        )}
+        {exercise.challenge && (
+          <div>
+            <dt>Desafio</dt>
+            <dd>{exercise.challenge}</dd>
+          </div>
+        )}
+        {exercise.steps && exercise.steps.length > 0 && (
+          <div>
+            <dt>Etapas sugeridas</dt>
+            <dd>
+              <ol>
+                {exercise.steps.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
+            </dd>
+          </div>
+        )}
+        {exercise.evidence && (
+          <div>
+            <dt>Evidência a registrar</dt>
+            <dd>{exercise.evidence}</dd>
+          </div>
+        )}
+        {exercise.criteria && exercise.criteria.length > 0 && (
+          <div>
+            <dt>Critérios</dt>
+            <dd>
+              <ul>
+                {exercise.criteria.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )}
+      </dl>
+    </section>
   )
 }
 
@@ -213,8 +291,8 @@ export function ExercisePlayer({
         <div>
           <h2 id="exercicios-title">Exercícios da unidade</h2>
           <p>
-            Respostas são verificadas localmente, com justificativas. Não há envio de dados para
-            serviços externos.
+            As respostas são corrigidas no navegador e o resultado é registrado na sua conta. Nenhum
+            dado é enviado a serviços externos.
           </p>
         </div>
         <div className="exercise-section__score">
@@ -265,6 +343,7 @@ export function ExercisePlayer({
 
               <h3 id={`${exercise.id}-title`}>{exercise.prompt}</h3>
               {exercise.context && <p className="exercise__context">{exercise.context}</p>}
+              <ExerciseBriefing exercise={exercise} />
 
               {exercise.kind === 'subnet' && subnetChallenge && (
                 <div className="subnet-prompt">
@@ -346,6 +425,119 @@ export function ExercisePlayer({
                             {choice.label}
                             {result && <span className="choice__rationale">{choice.rationale}</span>}
                           </span>
+                        </label>
+                      )
+                    })}
+                  </fieldset>
+                )}
+
+                {exercise.kind === 'classify' && (
+                  <fieldset className="classify-list" disabled={Boolean(result)}>
+                    <legend className="sr-only">Classificação dos itens</legend>
+                    <div className="classify-list__head mono" aria-hidden="true">
+                      <span>Item</span>
+                      <span>Categoria</span>
+                    </div>
+                    {exercise.items.map((item) => {
+                      const selected =
+                        response?.kind === 'classify' ? response.assignments[item.id] ?? '' : ''
+                      return (
+                        <label className="classify-item" key={item.id}>
+                          <span className="classify-item__label">{item.label}</span>
+                          <select
+                            aria-label={`Categoria de ${item.label}`}
+                            value={selected}
+                            onChange={(event) =>
+                              updateResponse(exercise, {
+                                kind: 'classify',
+                                assignments: {
+                                  ...(response?.kind === 'classify' ? response.assignments : {}),
+                                  [item.id]: event.target.value,
+                                },
+                              })
+                            }
+                          >
+                            <option value="">Selecione…</option>
+                            {exercise.categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.label}
+                              </option>
+                            ))}
+                          </select>
+                          {result && (
+                            <span
+                              className={`classify-item__result ${
+                                selected === item.expectedCategoryId ? 'is-correct' : 'is-wrong'
+                              }`}
+                            >
+                              {selected === item.expectedCategoryId
+                                ? 'Classificação correta.'
+                                : `Esperado: ${
+                                    exercise.categories.find(
+                                      (category) => category.id === item.expectedCategoryId,
+                                    )?.label ?? item.expectedCategoryId
+                                  }.${
+                                    item.rationale ? ` ${item.rationale}` : ''
+                                  }`}
+                            </span>
+                          )}
+                        </label>
+                      )
+                    })}
+                  </fieldset>
+                )}
+
+                {exercise.kind === 'match' && (
+                  <fieldset className="match-list" disabled={Boolean(result)}>
+                    <legend className="sr-only">Correspondência entre colunas</legend>
+                    <div className="match-list__head mono" aria-hidden="true">
+                      <span>Elemento</span>
+                      <span>Corresponde a</span>
+                    </div>
+                    {exercise.left.map((item) => {
+                      const selected =
+                        response?.kind === 'match' ? response.matches[item.id] ?? '' : ''
+                      return (
+                        <label className="match-item" key={item.id}>
+                          <span className="match-item__label">{item.label}</span>
+                          <select
+                            aria-label={`Correspondência de ${item.label}`}
+                            value={selected}
+                            onChange={(event) =>
+                              updateResponse(exercise, {
+                                kind: 'match',
+                                matches: {
+                                  ...(response?.kind === 'match' ? response.matches : {}),
+                                  [item.id]: event.target.value,
+                                },
+                              })
+                            }
+                          >
+                            <option value="">Selecione…</option>
+                            {exercise.right.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          {result && (
+                            <span
+                              className={`match-item__result ${
+                                selected === exercise.correctMatches[item.id]
+                                  ? 'is-correct'
+                                  : 'is-wrong'
+                              }`}
+                            >
+                              {selected === exercise.correctMatches[item.id]
+                                ? 'Correspondência correta.'
+                                : `Esperado: ${
+                                    exercise.right.find(
+                                      (option) =>
+                                        option.id === exercise.correctMatches[item.id],
+                                    )?.label ?? exercise.correctMatches[item.id]
+                                  }.`}
+                            </span>
+                          )}
                         </label>
                       )
                     })}
@@ -657,6 +849,11 @@ export function ExercisePlayer({
                   {exercise.kind === 'short' && (
                     <p className="result__sample">
                       Resposta de referência: <code>{exercise.sampleAnswer}</code>
+                    </p>
+                  )}
+                  {exercise.referenceAnswer && (
+                    <p className="result__sample">
+                      Formulação de referência: <code>{exercise.referenceAnswer}</code>
                     </p>
                   )}
                   {!result.passed && exercise.kind === 'order' && (

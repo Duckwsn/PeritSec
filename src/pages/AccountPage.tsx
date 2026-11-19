@@ -103,7 +103,7 @@ export function AccountPage() {
   return (
     <div className="account-page">
       <PageHeader
-        title="Sua conta local."
+        title="Sua conta."
         lede="O nível orienta o ponto de partida; as competências demonstradas determinam o avanço. Alterar o nível não apaga progresso, relatórios ou anotações."
         meta={
           <>
@@ -135,7 +135,7 @@ export function AccountPage() {
           <section className="page-section" aria-labelledby="account-profile-title">
             <SectionHeading
               title="Perfil e ponto de partida"
-              description="O nome de usuário identifica a conta nesta instalação e não pode ser alterado. O nome de exibição pode ser atualizado."
+              description="O nome de usuário identifica a conta na plataforma e não pode ser alterado. O nome de exibição pode ser atualizado."
             />
             <form className="account-form" onSubmit={handleProfile} noValidate>
               {profileMessage && (
@@ -210,7 +210,7 @@ export function AccountPage() {
           <section className="page-section" aria-labelledby="account-recovery-title">
             <SectionHeading
               title="Recuperação de acesso"
-              description="Sem e-mail, a redefinição usa um código local. Gerar um novo código invalida o anterior."
+              description="Sem e-mail, a redefinição usa um código de recuperação. Gerar um novo código invalida o anterior."
             />
             {recoveryCode && (
               <div className="account-recovery" role="status">
@@ -249,7 +249,7 @@ export function AccountPage() {
             <section className="page-section" aria-labelledby="account-import-title">
               <SectionHeading
                 title="Progresso anterior"
-                description="Existe um progresso criado antes das contas locais. Ele pode ser associado a uma única conta."
+                description="Existe um progresso criado antes da migração para contas. Ele pode ser associado a uma única conta."
               />
               {importMessage && (
                 <div className="inline-feedback inline-feedback--ok" role="status">
@@ -294,22 +294,22 @@ export function AccountPage() {
               </div>
               <div>
                 <dt>Armazenamento</dt>
-                <dd>PostgreSQL local · dados separados por conta</dd>
+                <dd>Serviço PeritSec · dados separados por conta</dd>
               </div>
               <div>
                 <dt>Nível efetivo</dt>
                 <dd>{level.label}</dd>
               </div>
               <div>
-                <dt>Papel nesta instalação</dt>
-                <dd>{isAdmin ? 'Administrador local' : 'Participante'}</dd>
+                <dt>Papel na plataforma</dt>
+                <dd>{isAdmin ? 'Administrador' : 'Participante'}</dd>
               </div>
             </dl>
             <p className="account-aside__note">
               <ShieldCheck size={15} aria-hidden="true" />
-              As contas e os dados pertencem a esta instalação. Não há sincronização entre
-              computadores nem promessa de isolamento contra alguém com controle administrativo do
-              Windows.
+              A conta acompanha você em qualquer navegador: o progresso fica associado ao usuário,
+              não ao computador. Quem tiver a senha e o código de recuperação pode acessar os mesmos
+              dados, então trate essas credenciais como pessoais.
             </p>
           </div>
           <div className="aside-panel admin-entry">
@@ -319,7 +319,7 @@ export function AccountPage() {
             </h2>
             <p>
               {isAdmin
-                ? 'Esta conta administra a instalação. A área administrativa lista as contas, permite alterar papéis e abre qualquer conteúdo sem exigir nível ou pré-requisitos.'
+                ? 'Esta conta administra a plataforma. A área administrativa lista as contas, permite alterar papéis e abre qualquer conteúdo sem exigir nível ou pré-requisitos.'
                 : 'A área administrativa está disponível para esta conta. Ao entrar, você pode confirmar a ativação do acesso total e liberar qualquer conteúdo sem nível ou pré-requisitos.'}
             </p>
             <Link className="button button--outline" to="/admin">

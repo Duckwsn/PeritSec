@@ -125,7 +125,7 @@ export function AdminPage() {
     if (result.ok) {
       setPending(null)
       setMessage(
-        `${target.displayName} agora é ${roleLabels[role].toLowerCase()} nesta instalação.`,
+        `${target.displayName} agora é ${roleLabels[role].toLowerCase()} na plataforma.`,
       )
       await load()
       if (target.id === account?.id) await refresh()
@@ -158,7 +158,7 @@ export function AdminPage() {
       <div className="content-gate">
         <PageHeader
           title="Tornar-se administrador?"
-          lede="A área administrativa está disponível para qualquer conta desta instalação. Antes de continuar, confirme se você quer liberar todo o conteúdo desta conta."
+          lede="A área administrativa está disponível para qualquer conta da plataforma. Antes de continuar, confirme se você quer liberar todo o conteúdo desta conta."
           meta={
             <span className="meta-item">
               <ShieldCheck size={14} aria-hidden="true" />
@@ -184,7 +184,7 @@ export function AdminPage() {
             </p>
             <ul className="gate-requirements">
               <li>Acesso total ao catálogo, incluindo casos avançados.</li>
-              <li>Gerenciamento de papéis das contas desta instalação.</li>
+              <li>Gerenciamento de papéis das contas da plataforma.</li>
               <li>Isolamento de progresso, notas e backups entre perfis mantido.</li>
             </ul>
             <p className="content-gate__safety">
@@ -221,15 +221,15 @@ export function AdminPage() {
   return (
     <div className="admin-page">
       <PageHeader
-        title="Administração local"
-        lede="Uma conta administradora pode abrir qualquer lição, laboratório ou caso, mesmo sem os pré-requisitos, e pode alterar o papel das demais contas. O acesso continua restrito ao loopback desta instalação."
+        title="Administração"
+        lede="Uma conta administradora pode abrir qualquer lição, laboratório ou caso, mesmo sem os pré-requisitos, e pode alterar o papel das demais contas. O acesso exige uma conta autenticada com papel de administrador."
         meta={
           <>
             <span className="meta-item">
               <ShieldCheck size={14} aria-hidden="true" />
               Acesso administrativo
             </span>
-            <span className="meta-item">PostgreSQL schema v{overview?.schemaVersion ?? 3}</span>
+            <span className="meta-item">Serviço PeritSec · schema v{overview?.schemaVersion ?? 3}</span>
             <span className="meta-item">
               {overview ? `${overview.accountCount} contas · ${overview.adminCount} administrador` : 'Carregando contas…'}
             </span>
@@ -245,7 +245,7 @@ export function AdminPage() {
           progresso, as notas ou os backups de outras contas: o isolamento entre perfis continua
           valendo.
         </p>
-        <Tag tone="teal">local</Tag>
+        <Tag tone="teal">plataforma</Tag>
       </div>
 
       {error && (
@@ -264,13 +264,13 @@ export function AdminPage() {
       <div className="progress-summary" aria-label="Resumo administrativo">
         <div className="progress-summary__item">
           <span className="progress-summary__value mono">{overview?.accountCount ?? '—'}</span>
-          <span className="progress-summary__label">Contas locais</span>
+          <span className="progress-summary__label">Contas</span>
           <span className="progress-summary__hint">Cada uma com progresso isolado.</span>
         </div>
         <div className="progress-summary__item">
           <span className="progress-summary__value mono">{overview?.adminCount ?? '—'}</span>
           <span className="progress-summary__label">Administradores</span>
-          <span className="progress-summary__hint">Sempre ao menos um nesta instalação.</span>
+          <span className="progress-summary__hint">Sempre ao menos uma na plataforma.</span>
         </div>
         <div className="progress-summary__item">
           <span className="progress-summary__value mono">{overview?.content.total ?? '—'}</span>
@@ -283,29 +283,29 @@ export function AdminPage() {
         </div>
         <div className="progress-summary__item">
           <span className="progress-summary__value mono">{backupTotal}</span>
-          <span className="progress-summary__label">Backups locais</span>
+          <span className="progress-summary__label">Backups</span>
           <span className="progress-summary__hint">Arquivos por conta, sem compartilhamento.</span>
         </div>
       </div>
 
       <section className="page-section" aria-labelledby="admin-accounts-title">
         <SectionHeading
-          title="Contas desta instalação"
+          title="Contas da plataforma"
           description="Papéis são verificados no servidor em cada requisição. Rebaixar a última conta administradora é recusado."
         />
 
         {loading && !overview && (
           <div className="auth-loading" role="status">
             <span className="auth-loading__mark" aria-hidden="true" />
-            <p>Carregando contas locais…</p>
+            <p>Carregando contas…</p>
           </div>
         )}
 
         {overview && (
-          <div className="table-wrap">
+          <div className="table-wrap" tabIndex={0}>
             <table className="data-table">
               <caption className="sr-only">
-                Contas locais com papel, nível, progresso e data de criação
+                Contas com papel, nível, progresso e data de criação
               </caption>
               <thead>
                 <tr>
@@ -407,7 +407,7 @@ export function AdminPage() {
           title="Catálogo completo"
           description="Todos os conteúdos compartilhados pelo motor de progressão. O acesso administrativo abre qualquer item, mas não marca conclusão sozinho."
         />
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0}>
           <table className="data-table data-table--compact">
             <caption className="sr-only">
               Catálogo de conteúdos com tipo, nível mínimo, pré-requisitos e link de abertura
@@ -468,7 +468,7 @@ export function AdminPage() {
             Limites do papel
           </h2>
           <p>
-            O papel administrativo pertence à instalação local. Ele não cria contas, não redefine
+            O papel administrativo é concedido no servidor. Ele não cria contas, não redefine
             senhas alheias e não expõe códigos de recuperação. Senhas continuam armazenadas apenas
             como hash scrypt.
           </p>
@@ -486,11 +486,11 @@ export function AdminPage() {
           <dl className="account-facts">
             <div>
               <dt>Armazenamento</dt>
-              <dd>PostgreSQL local · schema v{overview?.schemaVersion ?? 3}</dd>
+              <dd>Serviço PeritSec · schema v{overview?.schemaVersion ?? 3}</dd>
             </div>
             <div>
               <dt>Contas</dt>
-              <dd>{overview?.accountCount ?? '—'} nesta instalação</dd>
+              <dd>{overview?.accountCount ?? '—'} na plataforma</dd>
             </div>
             <div>
               <dt>Atualizado em</dt>

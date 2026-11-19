@@ -91,6 +91,21 @@
     padding-top: 0;
   }
 
+  .exercise-briefing__grid > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+
+  .classify-list__head,
+  .match-list__head {
+    display: none;
+  }
+
+  .classify-item,
+  .match-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .site-footer {
     font-size: var(--text-xs);
   }

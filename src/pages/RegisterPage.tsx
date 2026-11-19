@@ -35,7 +35,7 @@ export function RegisterPage() {
       <AuthShell>
         <div className="auth-loading" role="status">
           <span className="auth-loading__mark" aria-hidden="true" />
-          <p>Verificando a instalação local…</p>
+          <p>Verificando o serviço…</p>
         </div>
       </AuthShell>
     )
@@ -95,17 +95,16 @@ export function RegisterPage() {
     <AuthShell>
       <div className="auth-page auth-page--register">
         <div className="auth-page__copy">
-          <h1 className="text-balance">Crie uma conta local para aprender com continuidade.</h1>
+          <h1 className="text-balance">Crie sua conta para aprender com continuidade.</h1>
           <p className="auth-page__lede">
             Cada conta mantém seu próprio nível, progresso, competências, laboratórios e relatórios.
-            Você pode criar mais de uma conta no mesmo computador e alternar entre elas sem misturar
-            históricos.
+            Você pode manter mais de uma conta e alternar entre elas sem misturar históricos.
           </p>
           <div className="auth-page__note">
             <Database size={18} aria-hidden="true" />
             <p>
-              Tudo é gravado no PostgreSQL desta instalação. Não há e-mail, telefone, OAuth ou envio de
-              dados para serviços externos.
+              O progresso é gravado no serviço do PeritSec e associado à sua conta. Não há e-mail,
+              telefone, OAuth ou envio de dados para serviços externos.
             </p>
           </div>
           <div className="auth-page__note">
@@ -161,7 +160,7 @@ export function RegisterPage() {
                 required
               />
               <span className="field__hint">
-                Único nesta instalação. Letras sem acento, números, ponto, hífen ou sublinhado.
+                Único na plataforma. Letras sem acento, números, ponto, hífen ou sublinhado.
               </span>
             </label>
 
@@ -230,9 +229,9 @@ export function RegisterPage() {
                   onChange={(event) => setMigrate(event.target.checked)}
                 />
                 <span>
-                  <strong>Importar o progresso anterior deste computador</strong>
+                  <strong>Importar o progresso anterior</strong>
                   <span>
-                    Havia um progresso criado antes das contas locais. Ele pode ser associado a esta
+                    Havia um progresso criado antes da migração para contas. Ele pode ser associado a esta
                     conta uma única vez; as próximas contas começarão vazias.
                   </span>
                 </span>
@@ -240,12 +239,11 @@ export function RegisterPage() {
             )}
 
             <button className="button button--primary button--full" type="submit" disabled={busy}>
-              {busy ? 'Criando conta…' : 'Criar conta local'}
+              {busy ? 'Criando conta…' : 'Criar conta'}
               <ArrowRight size={16} aria-hidden="true" />
             </button>
             <p className="auth-page__local-note">
-              Sem e-mail e sem sincronização. Guarde a senha e o código de recuperação que será
-              exibido na próxima etapa.
+              Sem e-mail. Guarde a senha e o código de recuperação que será exibido na próxima etapa.
             </p>
           </form>
           <div className="auth-page__links">

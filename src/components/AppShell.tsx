@@ -84,7 +84,7 @@ function Breadcrumbs() {
     if (path === '/progresso') return [{ label: 'Meu progresso' }]
     if (path === '/metodologia') return [{ label: 'Metodologia' }]
     if (path === '/admin') return [{ label: 'Administração' }]
-    if (path === '/conta') return [{ label: 'Conta local' }]
+    if (path === '/conta') return [{ label: 'Conta' }]
     if (path === '/comecar') return [{ label: 'Comece por aqui' }]
     if (path === '/nao-encontrado') return [{ label: 'Página não encontrada' }]
     return items
@@ -192,8 +192,8 @@ export function AppShell() {
               className={`site-header__account ${location.pathname === '/conta' ? 'is-active' : ''}`}
               to="/conta"
               aria-current={location.pathname === '/conta' ? 'page' : undefined}
-              aria-label={`Conta local de ${account.displayName}`}
             >
+              <span className="sr-only">Conta</span>
               <UserRound size={16} aria-hidden="true" />
               <span className="site-header__account-name">{account.displayName}</span>
               <span className="site-header__account-level mono">
@@ -265,7 +265,7 @@ export function AppShell() {
               className={`menu-drawer__link ${location.pathname === '/conta' ? 'is-active' : ''}`}
               aria-current={location.pathname === '/conta' ? 'page' : undefined}
             >
-              <span>Conta local</span>
+              <span>Conta</span>
               <UserRound size={15} aria-hidden="true" />
             </Link>
             <Link
@@ -308,7 +308,7 @@ export function AppShell() {
           <span>PeritSec · cenários sintéticos para prática educacional.</span>
           <span className="site-footer__links">
             <Link to="/metodologia">Metodologia, limites e avaliação</Link>
-            <Link to="/admin">Administração local</Link>
+            <Link to="/admin">Administração</Link>
           </span>
         </footer>
       </div>

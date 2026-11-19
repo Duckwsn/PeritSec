@@ -137,7 +137,7 @@
 
 .case-tabs {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
   gap: 1px;
   margin-top: var(--space-6);
   background: var(--line);
@@ -1275,6 +1275,185 @@
   color: var(--ink-faint);
 }
 
+/* Base normativa */
+.legal-refs__intro {
+  max-width: 76ch;
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.legal-refs {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.legal-refs li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-refs li > svg {
+  flex: none;
+  margin-top: 0.18rem;
+  color: var(--teal);
+}
+
+.legal-refs a {
+  color: var(--teal-strong);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-refs a:hover {
+  color: var(--teal);
+}
+
+.legal-refs p {
+  margin-top: 0.15rem;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+/* Custódia e quesitos */
+.custody-list,
+.quesito-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.custody-item,
+.quesito {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.custody-item.is-correct {
+  border-color: #b7d3c0;
+}
+
+.custody-item.is-wrong {
+  border-color: #ddbeb6;
+}
+
+.custody-item__head,
+.quesito__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.custody-item__head > .mono,
+.quesito__head > .mono {
+  flex: none;
+  padding-top: 0.12rem;
+  color: var(--teal);
+  font-size: var(--text-xs);
+}
+
+.custody-item__head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.custody-item__head h3,
+.quesito__head h3 {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.custody-item__head p,
+.quesito__guidance {
+  margin-top: 0.15rem;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.custody-item__head .tag {
+  flex: none;
+}
+
+.custody-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.custody-options label {
+  flex: 1;
+  min-width: 9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.48rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.custody-options label:hover {
+  border-color: var(--teal);
+}
+
+.custody-options label.is-selected {
+  border-color: var(--teal);
+  background: var(--teal-wash);
+  color: var(--teal-strong);
+}
+
+.custody-options input {
+  accent-color: var(--teal);
+}
+
+.custody-item__key,
+.quesito__key {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-left: 2px solid var(--teal);
+  background: var(--teal-wash);
+}
+
+.custody-item__key strong,
+.quesito__key strong {
+  font-size: var(--text-xs);
+}
+
+.custody-item__key p,
+.quesito__key p {
+  margin-top: 0.15rem;
+  color: var(--ink-soft);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.quesito .field {
+  margin-top: var(--space-3);
+}
+
+.quesito textarea {
+  margin-top: 0.2rem;
+}
+
 /* Relatório */
 .validation-box {
   display: flex;
@@ -1884,6 +2063,12 @@
   line-height: 1.6;
 }
 
+.case-dossier-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
 .case-dossier {
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--amber);
@@ -2160,8 +2345,8 @@
   }
 
   .case-tabs {
-    overflow-x: auto;
-    grid-template-columns: repeat(6, minmax(9rem, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow-x: visible;
   }
 }
 

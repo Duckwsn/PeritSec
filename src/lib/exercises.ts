@@ -11,6 +11,20 @@ interface ExerciseBase {
   hints: string[]
   explanation: string
   prerequisites?: string[]
+  /** Conhecimentos mobilizados, exibidos no briefing da atividade. */
+  knowledge?: string[]
+  /** Material de apoio ou referência curta para consulta durante a atividade. */
+  support?: string
+  /** O que torna a atividade exigente e como o raciocínio será cobrado. */
+  challenge?: string
+  /** Roteiro sugerido de trabalho, sem entregar a resposta. */
+  steps?: string[]
+  /** Evidência que o estudante precisa registrar para sustentar a resposta. */
+  evidence?: string
+  /** Critérios observáveis de uma resposta defensável. */
+  criteria?: string[]
+  /** Formulação de referência para conferência após a correção. */
+  referenceAnswer?: string
 }
 
 export interface McqExercise extends ExerciseBase {
@@ -44,12 +58,34 @@ export interface MultiExercise extends ExerciseBase {
   submitLabel?: string
 }
 
+export interface ClassifyExercise extends ExerciseBase {
+  kind: 'classify'
+  categories: Array<{ id: string; label: string; description?: string }>
+  items: Array<{
+    id: string
+    label: string
+    expectedCategoryId: string
+    rationale?: string
+  }>
+  submitLabel?: string
+}
+
+export interface MatchExercise extends ExerciseBase {
+  kind: 'match'
+  left: Array<{ id: string; label: string }>
+  right: Array<{ id: string; label: string }>
+  correctMatches: Record<string, string>
+  submitLabel?: string
+}
+
 export type Exercise =
   | McqExercise
   | ShortExercise
   | SubnetExercise
   | OrderExercise
   | MultiExercise
+  | ClassifyExercise
+  | MatchExercise
 
 export interface SubnetResponseValues {
   network: string
@@ -65,6 +101,8 @@ export type ExerciseResponse =
   | { kind: 'subnet'; values: SubnetResponseValues; seed: number }
   | { kind: 'order'; order: string[] }
   | { kind: 'multi'; ids: string[] }
+  | { kind: 'classify'; assignments: Record<string, string> }
+  | { kind: 'match'; matches: Record<string, string> }
 
 export interface ResultDetail {
   label: string
@@ -113,6 +151,16 @@ export function isResponseComplete(exercise: Exercise, response: ExerciseRespons
       )
     case 'multi':
       return response.kind === 'multi' && response.ids.length > 0
+    case 'classify':
+      return (
+        response.kind === 'classify' &&
+        exercise.items.every((item) => Boolean(response.assignments[item.id]))
+      )
+    case 'match':
+      return (
+        response.kind === 'match' &&
+        exercise.left.every((item) => Boolean(response.matches[item.id]))
+      )
   }
 }
 
@@ -214,6 +262,64 @@ export function gradeExercise(exercise: Exercise, response: ExerciseResponse): E
         summary: passed
           ? 'Seleção correta.'
           : 'A seleção inclui itens indevidos ou deixa de fora elementos necessários.',
+        details,
+      }
+    }
+    case 'classify': {
+      if (response.kind !== 'classify') {
+        throw new Error('Resposta incompatível com exercício de classificação.')
+      }
+      const details = exercise.items.map((item) => {
+        const expectedCategory = exercise.categories.find(
+          (category) => category.id === item.expectedCategoryId,
+        )
+        const actualCategory = exercise.categories.find(
+          (category) => category.id === response.assignments[item.id],
+        )
+        return {
+          label: item.label,
+          correct: response.assignments[item.id] === item.expectedCategoryId,
+          expected: expectedCategory?.label ?? item.expectedCategoryId,
+          actual: actualCategory?.label ?? '—',
+        }
+      })
+      const correctCount = details.filter((detail) => detail.correct).length
+      const passed = correctCount === details.length
+      return {
+        passed,
+        score: correctCount / details.length,
+        summary: passed
+          ? 'Classificação correta em todos os itens.'
+          : `${correctCount} de ${details.length} itens classificados corretamente. Reveja a propriedade que define cada categoria.`,
+        details,
+      }
+    }
+    case 'match': {
+      if (response.kind !== 'match') {
+        throw new Error('Resposta incompatível com exercício de correspondência.')
+      }
+      const details = exercise.left.map((item) => {
+        const expected = exercise.right.find(
+          (candidate) => candidate.id === exercise.correctMatches[item.id],
+        )
+        const actual = exercise.right.find(
+          (candidate) => candidate.id === response.matches[item.id],
+        )
+        return {
+          label: item.label,
+          correct: response.matches[item.id] === exercise.correctMatches[item.id],
+          expected: expected?.label ?? exercise.correctMatches[item.id],
+          actual: actual?.label ?? '—',
+        }
+      })
+      const correctCount = details.filter((detail) => detail.correct).length
+      const passed = correctCount === details.length
+      return {
+        passed,
+        score: correctCount / details.length,
+        summary: passed
+          ? 'Correspondência correta.'
+          : `${correctCount} de ${details.length} correspondências corretas. Compare a função de cada elemento com o critério pedido.`,
         details,
       }
     }

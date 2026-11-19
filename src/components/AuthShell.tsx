@@ -27,14 +27,14 @@ export function AuthShell({ children }: { children: ReactNode }) {
             <span>formação técnica</span>
           </span>
         </span>
-        <span className="auth-top__note mono">instalação local</span>
+        <span className="auth-top__note mono">área de acesso</span>
       </header>
       <main id="conteudo" className="auth-main" tabIndex={-1}>
         {children}
       </main>
       <footer className="auth-footer">
-        <span>PeritSec · dados sintéticos, prática local.</span>
-        <span>As contas pertencem a esta instalação e não são sincronizadas entre computadores.</span>
+        <span>PeritSec · dados sintéticos, prática verificável.</span>
+        <span>O nível, o progresso e o histórico ficam associados à sua conta.</span>
       </footer>
     </div>
   )

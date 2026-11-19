@@ -289,11 +289,11 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       <ProgressContext.Provider value={value}>
         <div className="storage-gate" role="alert">
           <div className="storage-gate__panel">
-            <h1>O servidor local não respondeu.</h1>
+            <h1>Não foi possível carregar seu progresso.</h1>
             <p>
-              O progresso desta conta fica no PostgreSQL da instalação local. Sem a API, a interface
-              não abre conteúdo nem grava alterações para evitar misturar contas ou simular um
-              progresso inexistente.
+              O progresso desta conta fica associado ao seu usuário. Sem conexão com o serviço, a
+              interface não abre conteúdo nem grava alterações para evitar misturar contas ou simular
+              um progresso inexistente.
             </p>
             {storageError && <p className="storage-gate__detail">{storageError}</p>}
             <button type="button" className="button button--primary" onClick={() => void reload()}>

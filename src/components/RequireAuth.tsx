@@ -9,7 +9,7 @@ export function RequireAuth() {
     return (
       <div className="auth-loading" role="status">
         <span className="auth-loading__mark" aria-hidden="true" />
-        <p>Carregando sua conta local…</p>
+        <p>Carregando sua conta…</p>
       </div>
     )
   }

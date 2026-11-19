@@ -134,4 +134,58 @@ describe('correção de exercícios', () => {
     expect(gradeExercise(multi, { kind: 'multi', ids: ['a'] }).passed).toBe(false)
     expect(gradeExercise(multi, { kind: 'multi', ids: ['a', 'b', 'c'] }).passed).toBe(false)
   })
+
+  it('corrige classificação por item e correspondência por par', () => {
+    const classify: Exercise = {
+      ...base,
+      kind: 'classify',
+      categories: [
+        { id: 'fato', label: 'Fato observado' },
+        { id: 'inferencia', label: 'Inferência' },
+        { id: 'limite', label: 'Limitação' },
+      ],
+      items: [
+        { id: 'i1', label: 'O lease entregou 8.8.8.8.', expectedCategoryId: 'fato' },
+        { id: 'i2', label: 'O cliente consultou um resolvedor externo.', expectedCategoryId: 'inferencia' },
+        { id: 'i3', label: 'Não há logs do cliente.', expectedCategoryId: 'limite' },
+      ],
+    }
+    expect(
+      isResponseComplete(classify, { kind: 'classify', assignments: { i1: 'fato', i2: 'inferencia' } }),
+    ).toBe(false)
+    expect(
+      isResponseComplete(classify, {
+        kind: 'classify',
+        assignments: { i1: 'fato', i2: 'inferencia', i3: 'limite' },
+      }),
+    ).toBe(true)
+    const classifyResult = gradeExercise(classify, {
+      kind: 'classify',
+      assignments: { i1: 'fato', i2: 'fato', i3: 'limite' },
+    })
+    expect(classifyResult.passed).toBe(false)
+    expect(classifyResult.details).toHaveLength(3)
+    expect(classifyResult.score).toBeCloseTo(2 / 3)
+
+    const match: Exercise = {
+      ...base,
+      kind: 'match',
+      left: [
+        { id: 'l1', label: 'Hash' },
+        { id: 'l2', label: 'Cadeia de custódia' },
+      ],
+      right: [
+        { id: 'r1', label: 'Integridade da cópia' },
+        { id: 'r2', label: 'Rastreabilidade documentada' },
+      ],
+      correctMatches: { l1: 'r1', l2: 'r2' },
+    }
+    expect(isResponseComplete(match, { kind: 'match', matches: { l1: 'r1' } })).toBe(false)
+    expect(
+      gradeExercise(match, { kind: 'match', matches: { l1: 'r1', l2: 'r2' } }).passed,
+    ).toBe(true)
+    expect(
+      gradeExercise(match, { kind: 'match', matches: { l1: 'r2', l2: 'r1' } }).score,
+    ).toBe(0)
+  })
 })

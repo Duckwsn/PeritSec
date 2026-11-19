@@ -224,7 +224,7 @@ export function LessonContent({ blocks }: { blocks: ContentBlock[] }) {
             )
           case 'table':
             return (
-              <div className="table-wrap" key={index}>
+              <div className="table-wrap" key={index} tabIndex={0}>
                 <table className="data-table">
                   {block.caption && <caption>{block.caption}</caption>}
                   <thead>

@@ -99,7 +99,7 @@ export async function apiRequest<T>(
         error:
           typeof record?.error === 'string' && record.error
             ? record.error
-            : `A API local respondeu HTTP ${response.status}.`,
+            : `O serviço respondeu HTTP ${response.status}.`,
         unauthorized: response.status === 401,
         unavailable: response.status >= 500,
       }
@@ -108,7 +108,7 @@ export async function apiRequest<T>(
   } catch {
     return {
       ok: false,
-      error: 'O servidor local não respondeu. Verifique se ele está em execução.',
+      error: 'O serviço não respondeu. Verifique a conexão e tente novamente.',
       unavailable: true,
     }
   } finally {

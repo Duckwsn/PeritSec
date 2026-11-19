@@ -159,6 +159,23 @@
   line-height: 1.6;
 }
 
+.lab-case-cta__links {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  .lab-case-cta__links {
+    width: 100%;
+  }
+
+  .lab-case-cta__links .button {
+    width: 100%;
+  }
+}
+
 /* Estrutura comum dos laboratórios */
 .lab-brief {
   display: grid;

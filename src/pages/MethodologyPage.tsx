@@ -91,7 +91,7 @@ export function MethodologyPage() {
       <section aria-label="Como a avaliação funciona">
         <SectionHeading
           title="Como a progressão é calculada"
-          description="O sistema não mede tempo de permanência, páginas abertas ou cliques. Cada ponto deriva de uma evidência registrada localmente."
+          description="O sistema não mede tempo de permanência, páginas abertas ou cliques. Cada ponto deriva de uma evidência registrada na conta."
         />
         <div className="method-grid method-grid--scoring">
           <div className="method-copy">
@@ -295,7 +295,7 @@ export function MethodologyPage() {
       <section aria-label="Segurança dos dados e privacidade">
         <SectionHeading
           title="Dados, privacidade e segurança operacional"
-          description="O aplicativo grava no PostgreSQL local, por conta, quando o backend está conectado. Não há envio para serviços externos nem cópia automática no navegador."
+          description="O aplicativo grava o progresso no serviço do PeritSec, por conta. Não há envio para serviços externos nem cópia automática no navegador."
         />
         <div className="method-grid">
           <div className="method-panel">
@@ -306,20 +306,18 @@ export function MethodologyPage() {
             <p>
               Identificadores de lições, exercícios, laboratórios e casos; pontuações; horários;
               notas e relatórios que você digitar; e um histórico resumido de atividade. O estado
-              fica no PostgreSQL local, em um registro separado para cada conta. Não existe cópia
+              fica na base do PeritSec, em um registro separado para cada conta. Não existe cópia
               automática em <code>localStorage</code>.
             </p>
             <p>
               A API aceita apenas as rotas previstas e não executa comandos do sistema operacional.
-              Nesta etapa, a persistência roda no PostgreSQL do ambiente local via Docker Compose.
-              Não há analytics de terceiros, OAuth, e-mail ou sincronização automática entre
-              dispositivos.
+              A persistência usa PostgreSQL com migrações versionadas. Não há analytics de terceiros,
+              OAuth, e-mail ou envio de dados para outros serviços.
             </p>
             <p>
-              Backups são arquivos JSON no subdiretório <code>backups</code> do diretório local de
-              dados, com hash SHA-256 registrado no PostgreSQL. Restaurar confere o hash e cria uma
-              cópia de segurança do estado atual antes de substituí-lo. A exportação JSON é gerada
-              pelo navegador.
+              Backups são arquivos JSON no diretório de dados do serviço, com hash SHA-256
+              registrado no banco de dados. Restaurar confere o hash e cria uma cópia de segurança do
+              estado atual antes de substituí-lo. A exportação JSON é gerada pelo navegador.
             </p>
           </div>
           <div className="method-panel">
@@ -335,7 +333,7 @@ export function MethodologyPage() {
               adequados.
             </p>
             <p>
-              Se o PostgreSQL local estiver indisponível, o acesso ao progresso é pausado até a
+              Se o serviço de dados estiver indisponível, o acesso ao progresso é pausado até a
               conexão ser restabelecida. Alterações ainda não confirmadas ficam apenas na memória da
               página; não há persistência de progresso de conta no navegador.
             </p>
@@ -352,11 +350,11 @@ export function MethodologyPage() {
           <article>
             <TriangleAlert size={17} aria-hidden="true" />
             <div>
-              <h3>Contas e backend locais</h3>
+              <h3>Contas e serviço de dados</h3>
               <p>
-                O progresso fica no PostgreSQL deste computador. O backend aceita apenas conexões de
-                loopback, sem sincronização com outros dispositivos. A senha pode ser redefinida
-                apenas com o código de recuperação local.
+                O progresso fica no serviço do PeritSec, associado à conta. Você pode entrar em outro
+                navegador ou dispositivo usando as mesmas credenciais. A senha pode ser redefinida
+                com o código de recuperação.
               </p>
             </div>
           </article>
@@ -439,8 +437,8 @@ export function MethodologyPage() {
                 restauração com hash.
               </li>
               <li>
-                API local restrita a loopback, com rotas fixas e validação de corpo; nenhum comando do
-                sistema operacional é executado.
+                API com rotas fixas e validação de corpo; nenhum comando do sistema operacional é
+                executado.
               </li>
               <li>Resultados determinísticos para o mesmo estado e comando.</li>
               <li>Sem dependência de APIs pagas ou serviços de IA para corrigir respostas.</li>

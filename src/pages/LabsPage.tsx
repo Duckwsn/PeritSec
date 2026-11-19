@@ -29,7 +29,6 @@ export function LabsPage() {
   const { account, isAdmin } = useAuth()
   const { progress } = useProgress()
   if (!account) return null
-  const caseDefinition = investigationCases[0]
   const networkCompleted = Object.keys(progress.labs).filter((id) =>
     id.startsWith('lab-redes:'),
   ).length
@@ -37,9 +36,6 @@ export function LabsPage() {
     (lab) => accessForContent(lab.id, account.expertise, progress, { admin: isAdmin }).completed,
   ).length
   const level = effectiveLevel(account.expertise, progress)
-  const caseAccess = accessForContent(caseDefinition.id, account.expertise, progress, {
-    admin: isAdmin,
-  })
 
   return (
     <div>
@@ -188,24 +184,33 @@ export function LabsPage() {
         <div>
           <h2>Aplique o método a um caso completo.</h2>
           <p>
-            Oito fontes de evidência, hipóteses concorrentes, linha do tempo com fusos diferentes e
-            relatório avaliado por rubrica.
+            {investigationCases.length} dossiês com evidências, hipóteses concorrentes, linha do
+            tempo com fusos diferentes e relatório avaliado por rubrica. Cada caso tem requisitos e
+            limites próprios.
           </p>
-          {!caseAccess.allowed && !caseAccess.historical && (
-            <p className="lab-case-cta__lock">
-              <Lock size={14} aria-hidden="true" />
-              O caso exige nível {levelLabel(caseAccess.minLevel)} e competências de rede, logs,
-              custódia e método. O acesso não é liberado apenas pela escolha do nível.
-            </p>
-          )}
         </div>
-        <Link className="button button--outline" to={`/casos/${caseDefinition.id}`}>
-          <FolderSearch size={18} aria-hidden="true" />
-          {caseAccess.allowed || caseAccess.historical
-            ? `Abrir ${caseDefinition.code}`
-            : 'Ver requisitos do caso'}
-          <ChevronRight size={16} aria-hidden="true" />
-        </Link>
+        <div className="lab-case-cta__links">
+          {investigationCases.map((caseDefinition) => {
+            const caseAccess = accessForContent(
+              caseDefinition.id,
+              account.expertise,
+              progress,
+              { admin: isAdmin },
+            )
+            const caseOpen = caseAccess.allowed || caseAccess.historical
+            return (
+              <Link
+                className="button button--outline"
+                to={caseOpen ? `/casos/${caseDefinition.id}` : '/casos'}
+                key={caseDefinition.id}
+              >
+                <FolderSearch size={18} aria-hidden="true" />
+                {caseOpen ? `Abrir ${caseDefinition.code}` : 'Ver requisitos dos casos'}
+                <ChevronRight size={16} aria-hidden="true" />
+              </Link>
+            )
+          })}
+        </div>
       </section>
 
       <div className="page-note">

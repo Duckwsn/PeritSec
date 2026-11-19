@@ -1275,6 +1275,901 @@ hash SHA-256: 9f2c... | verificado em: 14/09/2026 10:05 BRT`,
     ],
   },
   {
+    id: 'vestigio-evidencia',
+    trackId: 'pericia',
+    moduleId: 'pericia-metodo',
+    order: 2,
+    title: 'Do vestígio à evidência avaliável',
+    eyebrow: 'Pertinência, registro e limite',
+    summary:
+      'Transforme registros dispersos em um conjunto avaliável: delimite o quesito, preserve a fonte, verifique a cópia e registre o que cada camada de afirmação permite sustentar.',
+    minutes: 20,
+    difficulty: 'avancado',
+    competency: 'forense',
+    objectives: [
+      'Selecionar fontes pela relação com o quesito, não pela facilidade de acesso.',
+      'Distinguir registro bruto, produto derivado e interpretação.',
+      'Documentar extração, correlação e limites de forma verificável.',
+    ],
+    prerequisites: [
+      'Custódia, integridade e o que um hash prova. Recomendado: Do log ao incidente.',
+    ],
+    blocks: [
+      {
+        kind: 'paragraph',
+        text: 'Um vestígio é um registro ou objeto que pode conter informação sobre um evento. Ele só se torna evidência útil quando é pertinente a uma pergunta e pode ser examinado de forma documentada. A mesma captura pode ser central para um quesito e irrelevante para outro. Por isso, a seleção de fontes é uma decisão técnica que precisa ser justificada, não uma coleção do que estava disponível.',
+      },
+      {
+        kind: 'table',
+        headers: ['Camada', 'Pergunta que responde', 'Exemplo'],
+        rows: [
+          ['Registro bruto', 'O que a fonte contém?', 'Arquivo de log preservado, com hash e origem registrados.'],
+          ['Produto derivado', 'O que a extração produziu?', 'CSV gerado a partir do log, com script e filtros documentados.'],
+          ['Interpretação', 'O que isso significa para o quesito?', 'A sequência é compatível com autenticação seguida de leitura.'],
+          ['Conclusão', 'O que pode ser sustentado, com qual confiança?', 'Houve acesso autenticado; a autoria não foi individualizada.'],
+        ],
+      },
+      {
+        kind: 'steps',
+        title: 'Da fonte ao achado verificável',
+        steps: [
+          {
+            title: 'Delimitar o quesito',
+            text: 'Escreva a pergunta antes de escolher a fonte. “Quem acessou?” e “houve acesso?” exigem conjuntos probatórios diferentes.',
+          },
+          {
+            title: 'Preservar e identificar',
+            text: 'Registre origem, responsável, data, hora, método e hash. Trabalhe sobre cópia verificada.',
+          },
+          {
+            title: 'Extrair com rastro',
+            text: 'Documente filtros, consultas, scripts e transformações. Um CSV sem método é um produto difícil de auditar.',
+          },
+          {
+            title: 'Correlacionar fontes independentes',
+            text: 'Compare registros de sistemas diferentes. Correlação reduz incerteza, mas não transforma coincidência em causalidade.',
+          },
+          {
+            title: 'Registrar o limite',
+            text: 'Diga o que a fonte não vê, o que ficou fora do recorte e qual diligência seria necessária para ir além.',
+          },
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'limite',
+        title: 'Ausência de registro não é prova de ausência',
+        text: 'Um histórico de navegador pode não cobrir navegação privada, outros perfis, outro navegador ou outro dispositivo. Um log pode ter rotação, filtro ou janela incompleta. A ausência de um evento no recorte examinado limita a conclusão; não a converte automaticamente em prova de que o evento nunca ocorreu.',
+      },
+      {
+        kind: 'heading',
+        text: 'O que uma cópia verificada permite afirmar',
+      },
+      {
+        kind: 'code',
+        label: 'Registro didático de exame',
+        code: `FONTE: prontuario-access.log (cópia de trabalho)
+ORIGEM: exportação da aplicação, 04/10/2026 09:10 BRT
+MÉTODO: preservação do original; cópia com bloqueador de escrita
+SHA-256: 4f8c... (calculado na cópia)
+FILTRO: 2026-10-03 22:35 a 22:45 BRT
+CAMPOS: horário, IP, método, rota, status
+LIMITE: recorte de dez minutos; sem payload; sem identificador de operador`,
+      },
+      {
+        kind: 'paragraph',
+        text: 'O hash confirma que a cópia corresponde ao valor registrado. Ele não confirma que o log é verdadeiro, completo ou produzido por uma pessoa específica. O valor probatório vem do conjunto: origem documentada, integridade verificável, método reproduzível e interpretação compatível com o quesito.',
+      },
+      {
+        kind: 'callout',
+        tone: 'nota',
+        title: 'Referências de estudo',
+        text: 'Os conceitos dialogam com NIST SP 800-86 e com a cadeia de custódia do Código de Processo Penal (arts. 158-A e seguintes). Requisitos concretos variam por jurisdição, instituição e finalidade. Este módulo é educacional e não substitui orientação jurídica ou protocolo oficial.',
+      },
+    ],
+    exercises: [
+      {
+        id: 'VE-E1',
+        kind: 'classify',
+        objective: 'Classificar materiais pela camada de elaboração.',
+        difficulty: 'avancado',
+        context:
+          'Uma equipe recebeu um log, gerou uma planilha e escreveu hipóteses sobre o caso. Nem todo material tem a mesma função.',
+        knowledge: ['Vestígio digital', 'Produto derivado', 'Interpretação', 'Rastreabilidade'],
+        support: 'Registro bruto é a fonte preservada; derivado é produzido por extração; interpretação é uma afirmação sobre o significado.',
+        challenge: 'Não confunda um arquivo derivado com a fonte original nem uma hipótese com um fato observado.',
+        steps: [
+          'Leia cada item e identifique quem o produziu e em que etapa.',
+          'Pergunte se o item é a fonte, uma transformação dela ou uma afirmação sobre ela.',
+          'Classifique todos os itens antes de conferir o resultado.',
+        ],
+        evidence: 'Registre a origem e o método de cada material que usar em uma análise.',
+        criteria: [
+          'Diferencia a fonte preservada do produto gerado por extração.',
+          'Reconhece que hipóteses e conclusões são interpretações.',
+          'Não trata uma captura de tela como equivalente ao arquivo original.',
+        ],
+        prompt: 'Classifique cada material conforme a camada em que foi produzido.',
+        hints: [
+          'Pergunte: este item existia antes do exame ou foi criado por ele?',
+          'Uma captura de tela é uma representação derivada, não o arquivo original.',
+        ],
+        categories: [
+          { id: 'bruto', label: 'Registro bruto', description: 'Fonte preservada, ainda não transformada pelo examinador.' },
+          { id: 'derivado', label: 'Produto derivado', description: 'Extração, conversão, recorte ou representação produzida a partir da fonte.' },
+          { id: 'interpretacao', label: 'Interpretação', description: 'Afirmação sobre o significado, a causa ou a autoria.' },
+        ],
+        items: [
+          {
+            id: 'a',
+            label: 'Arquivo de log recebido com hash e termo de origem.',
+            expectedCategoryId: 'bruto',
+            rationale: 'É a fonte preservada. O hash permite verificar integridade em relação ao valor registrado.',
+          },
+          {
+            id: 'b',
+            label: 'CSV gerado por script a partir do log, com filtro de horário.',
+            expectedCategoryId: 'derivado',
+            rationale: 'É um produto de extração. O script e o filtro precisam ser documentados para permitir revisão.',
+          },
+          {
+            id: 'c',
+            label: 'Frase: “houve autenticação seguida de leitura do prontuário”.',
+            expectedCategoryId: 'interpretacao',
+            rationale: 'É uma afirmação sobre o significado dos eventos, sustentada por registros, mas não é o registro em si.',
+          },
+          {
+            id: 'd',
+            label: 'Captura de tela de um recorte do log.',
+            expectedCategoryId: 'derivado',
+            rationale: 'É uma representação parcial. Não substitui o arquivo original nem documenta o que ficou fora do recorte.',
+          },
+          {
+            id: 'e',
+            label: 'Hipótese: “o tablet apreendido foi usado no acesso”.',
+            expectedCategoryId: 'interpretacao',
+            rationale: 'É uma hipótese a testar. A ausência do domínio no histórico não a confirma nem a exclui.',
+          },
+          {
+            id: 'f',
+            label: 'Resposta da operadora recebida por ofício, em PDF.',
+            expectedCategoryId: 'bruto',
+            rationale: 'É um documento recebido e preservado. Sua origem e autenticidade devem ser documentadas.',
+          },
+        ],
+        explanation:
+          'A classificação organiza o raciocínio: fonte, transformação e afirmação não se confundem. Um produto derivado pode ser correto e ainda assim não substituir a fonte; uma interpretação pode ser defensável e ainda assim não ser um fato observado.',
+        referenceAnswer:
+          'Registro bruto: log recebido e resposta da operadora. Derivado: CSV e captura de tela. Interpretação: a frase sobre autenticação e a hipótese sobre o tablet.',
+      },
+      {
+        id: 'VE-E2',
+        kind: 'match',
+        objective: 'Relacionar quesitos às fontes capazes de respondê-los.',
+        difficulty: 'avancado',
+        context:
+          'Nem toda fonte responde a qualquer pergunta. A seleção precisa considerar o que cada sistema registra e o que ele não vê.',
+        knowledge: ['Correlação de fontes', 'Limites de visibilidade', 'Quesitos periciais'],
+        support: 'Pergunte qual sistema teria o dado necessário e qual seria o limite desse registro.',
+        challenge: 'Evite usar uma fonte apenas porque ela está disponível; relacione-a ao quesito.',
+        steps: [
+          'Leia o quesito e sublinhe o dado necessário.',
+          'Identifique o sistema que produziria esse dado.',
+          'Verifique se a fonte escolhida realmente registra o dado ou apenas o contexto.',
+        ],
+        evidence: 'Para cada quesito, indique a fonte e o limite que ela apresenta.',
+        criteria: [
+          'Relaciona autenticação ao serviço de identidade.',
+          'Relaciona compartilhamento de IP à resposta da operadora.',
+          'Não usa o exame do tablet para provar custódia.',
+        ],
+        prompt: 'Associe cada quesito à fonte mais adequada para examiná-lo.',
+        hints: [
+          'Custódia é documentada por autos e termos, não por logs de aplicação.',
+          'O compartilhamento de um IP público é uma informação da operadora, não do servidor da aplicação.',
+        ],
+        left: [
+          { id: 'q1', label: 'O acesso foi autenticado?' },
+          { id: 'q2', label: 'O IP público era compartilhado?' },
+          { id: 'q3', label: 'A custódia está documentada de forma contínua?' },
+          { id: 'q4', label: 'O tablet acessou o domínio no período examinado?' },
+        ],
+        right: [
+          { id: 'r1', label: 'Log do serviço de identidade e da aplicação' },
+          { id: 'r2', label: 'Resposta da operadora sobre CGNAT e fluxos' },
+          { id: 'r3', label: 'Auto de custódia, termos de transferência e registro de armário' },
+          { id: 'r4', label: 'Resumo da aquisição e exame do histórico do dispositivo' },
+        ],
+        correctMatches: { q1: 'r1', q2: 'r2', q3: 'r3', q4: 'r4' },
+        explanation:
+          'Cada quesito aponta para um tipo de registro e para um limite próprio. A correlação entre fontes é necessária porque nenhuma delas responde sozinha a todas as perguntas.',
+        referenceAnswer:
+          'Autenticação: logs de identidade e aplicação. Compartilhamento do IP: resposta da operadora. Custódia: autos e termos. Uso do tablet: exame do dispositivo, com seus limites.',
+      },
+      {
+        id: 'VE-E3',
+        kind: 'order',
+        objective: 'Sequenciar o tratamento de uma fonte até o achado.',
+        difficulty: 'intermediario',
+        context:
+          'A equipe recebeu uma cópia de log e precisa produzir um achado que possa ser revisado por outra pessoa.',
+        knowledge: ['Método pericial', 'Preservação', 'Documentação de extração'],
+        support: 'A sequência começa pela pergunta e termina no registro do limite, não na conclusão mais forte possível.',
+        challenge: 'A ordem precisa preservar a possibilidade de verificação, mesmo que o resultado seja inconclusivo.',
+        steps: [
+          'Comece pelo quesito que a análise deve responder.',
+          'Preserve e verifique antes de transformar.',
+          'Termine registrando o que não foi possível concluir.',
+        ],
+        evidence: 'Descreva a ordem e o motivo de cada etapa.',
+        criteria: [
+          'Delimita o quesito antes de examinar.',
+          'Verifica integridade antes da extração.',
+          'Registra limitações ao final.',
+        ],
+        prompt: 'Ordene as etapas de tratamento de uma fonte até um achado verificável.',
+        hints: [
+          'Não se extrai dado de uma cópia cuja integridade ainda não foi verificada.',
+          'A limitação não é o último detalhe: ela condiciona a conclusão.',
+        ],
+        items: [
+          { id: 'extract', label: 'Extrair e normalizar os campos relevantes' },
+          { id: 'scope', label: 'Delimitar o quesito e o recorte necessário' },
+          { id: 'limit', label: 'Registrar incertezas e limites da fonte' },
+          { id: 'preserve', label: 'Preservar, identificar e verificar a integridade da cópia' },
+          { id: 'correlate', label: 'Correlacionar com fontes independentes' },
+        ],
+        correctOrder: ['scope', 'preserve', 'extract', 'correlate', 'limit'],
+        explanation:
+          'O quesito orienta o recorte; a preservação garante verificabilidade; a extração produz o dado; a correlação reduz incerteza; o limite impede que a conclusão ultrapasse o que a fonte permite.',
+        referenceAnswer:
+          'Delimitar o quesito, preservar e verificar, extrair, correlacionar e registrar limites.',
+      },
+    ],
+    takeaways: [
+      'Pertinência ao quesito vem antes da conveniência da fonte.',
+      'Registro, produto derivado, interpretação e conclusão são camadas diferentes.',
+      'Ausência de registro não prova ausência do evento.',
+      'Um achado verificável inclui método, integridade e limites.',
+    ],
+  },
+  {
+    id: 'ip-nao-e-pessoa',
+    trackId: 'pericia',
+    moduleId: 'pericia-casos',
+    order: 1,
+    title: 'O IP não é uma pessoa',
+    eyebrow: 'Endereço, fluxo e atribuição',
+    summary:
+      'Entenda por que um endereço IP, isoladamente, não prova autoria. Diferencie IP público, CGNAT, porta, assinante, dispositivo e pessoa.',
+    minutes: 22,
+    difficulty: 'avancado',
+    competency: 'forense',
+    objectives: [
+      'Explicar a diferença entre localizar uma conexão e individualizar uma pessoa.',
+      'Interpretar registros NAT/CGNAT com porta, data e hora.',
+      'Reconhecer os limites de user-agent, credencial compartilhada e histórico de navegador.',
+    ],
+    prerequisites: [
+      'Do vestígio à evidência avaliável. Recomendado: TCP, UDP, DNS e DHCP.',
+    ],
+    blocks: [
+      {
+        kind: 'paragraph',
+        text: 'Um endereço IP identifica uma interface lógica em um determinado contexto de rede. Ele não é um documento de identidade, não possui nome civil e não aponta, por si só, para uma pessoa. Em uma conexão doméstica, um IP público pode ser traduzido para vários dispositivos por NAT. Em uma operadora, pode ser compartilhado por muitos assinantes por CGNAT. Quanto mais compartilhamento, menor a capacidade de individualização.',
+      },
+      {
+        kind: 'table',
+        headers: ['Registro', 'O que costuma mostrar', 'O que não mostra sozinho'],
+        rows: [
+          ['IP público', 'Ponto de saída da conexão', 'Pessoa, dispositivo ou intenção'],
+          ['Mapeamento CGNAT', 'IP público, porta e instante traduzidos para um IP privado da operadora', 'Quem operava o dispositivo'],
+          ['User-agent', 'Software declarado pelo cliente', 'Identidade ou dispositivo único; pode ser alterado'],
+          ['Log de autenticação', 'Credencial usada e resultado', 'Operador individual, se a credencial é compartilhada'],
+          ['Histórico do navegador', 'Parte da navegação em um perfil e período', 'Outros perfis, navegação privada, outros dispositivos'],
+        ],
+      },
+      {
+        kind: 'steps',
+        title: 'Como uma correlação responsável funciona',
+        steps: [
+          {
+            title: 'Preservar os registros',
+            text: 'Solicite a preservação de logs NAT, autenticação e aplicação com janela, fuso e campos definidos.',
+          },
+          {
+            title: 'Correlacionar porta e horário',
+            text: 'Associe o fluxo do IP público à tradução interna usando porta de origem e instante, com margem documentada.',
+          },
+          {
+            title: 'Identificar o assinante, se possível',
+            text: 'A operadora pode associar o fluxo a um contrato. Isso ainda não identifica a pessoa que operava o aparelho.',
+          },
+          {
+            title: 'Buscar o dispositivo e o contexto',
+            text: 'Examine aparelhos e registros de acesso físico com autorização adequada. Documente o que cada exame cobre.',
+          },
+          {
+            title: 'Declarar o que permanece indeterminado',
+            text: 'Se o conjunto não individualiza a pessoa, a conclusão correta é a indeterminação, não a suspeita elevada a fato.',
+          },
+        ],
+      },
+      {
+        kind: 'code',
+        label: 'Mapeamento CGNAT didático',
+        code: `Janela: 03/10/2026 22:39-22:43 BRT (04/10/2026 01:39-01:43 UTC)
+Fluxos observados no servidor (UTC):
+  198.51.100.77:61210 -> 203.0.113.10:443 em 01:39:58Z
+  198.51.100.77:61210 -> 203.0.113.10:443 em 01:40:31Z
+  198.51.100.77:61211 -> 203.0.113.10:443 em 01:41:05Z
+  198.51.100.77:61211 -> 203.0.113.10:443 em 01:41:07Z
+  198.51.100.77:61211 -> 203.0.113.10:443 em 01:41:26Z
+  198.51.100.77:61212 -> 203.0.113.10:443 em 01:42:14Z
+
+Resposta da operadora (UTC):
+  198.51.100.77:61210 -> 100.64.12.34:41022 em 01:39:58Z
+  198.51.100.77:61210 -> 100.64.12.34:41022 em 01:40:31Z
+  198.51.100.77:61211 -> 100.64.12.34:41022 em 01:41:05Z
+  198.51.100.77:61211 -> 100.64.12.34:41022 em 01:41:07Z
+  198.51.100.77:61211 -> 100.64.12.34:41022 em 01:41:26Z
+  198.51.100.77:61212 -> 100.64.12.34:41022 em 01:42:14Z
+
+Limite: a tradução associa fluxos a um endereço interno.
+Ela não informa, sozinha, qual pessoa operava o dispositivo.`,
+      },
+      {
+        kind: 'callout',
+        tone: 'limite',
+        title: 'CGNAT compartilha, não individualiza',
+        text: 'A faixa 100.64.0.0/10 é reservada para compartilhamento de endereços entre operadoras e clientes (RFC 6598). Vários assinantes podem aparecer no mesmo IP público em instantes próximos. Sem correlação de porta, data e hora, o endereço público é apenas um ponto de saída compartilhado.',
+      },
+      {
+        kind: 'callout',
+        tone: 'atencao',
+        title: 'Suspeita não é atribuição',
+        text: 'Um nome mencionado por colegas, um aparelho apreendido ou um histórico sem determinado domínio podem orientar diligências. Nenhum desses elementos, isolado, demonstra que uma pessoa específica realizou o acesso. A conclusão pericial deve separar o evento documentado da autoria não individualizada.',
+      },
+      {
+        kind: 'callout',
+        tone: 'nota',
+        title: 'Marco civil, dados e devido processo',
+        text: 'No Brasil, a Lei nº 12.965/2014 disciplina guarda e disponibilização de registros de conexão e de acesso a aplicações, com proteção de dados e hipóteses legais específicas. A LGPD incide sobre o tratamento de dados pessoais. Pedidos concretos de registros devem observar o canal e a base legal aplicáveis; este exercício é educacional e não orienta obtenção de dados reais.',
+      },
+    ],
+    exercises: [
+      {
+        id: 'IP-E1',
+        kind: 'mcq',
+        objective: 'Delimitar o que um IP público permite concluir.',
+        difficulty: 'avancado',
+        context:
+          'O servidor registra uma sessão autenticada a partir de um IP público. A operadora informa que o endereço é compartilhado por CGNAT.',
+        knowledge: ['Endereçamento IP', 'CGNAT', 'Atribuição de autoria'],
+        support: 'Um IP público pode representar muitos fluxos e muitos assinantes ao mesmo tempo.',
+        challenge: 'A alternativa precisa separar o fato técnico da identificação de pessoa ou dispositivo.',
+        steps: [
+          'Identifique o que o servidor registrou diretamente.',
+          'Considere o que a operadora acrescentou sobre compartilhamento.',
+          'Elimine alternativas que saltam para autoria ou negam o evento.',
+        ],
+        evidence: 'Aponte qual registro sustenta a conexão e qual registro limita a atribuição.',
+        criteria: [
+          'Reconhece a conexão documentada.',
+          'Não trata o IP como identificador de pessoa.',
+          'Não nega o evento apenas porque o IP é compartilhado.',
+        ],
+        prompt:
+          'O que o endereço IP, isoladamente, permite concluir sobre o acesso registrado?',
+        hints: [
+          'O IP localiza um ponto de saída; não carrega nome civil.',
+          'CGNAT significa que vários fluxos podem compartilhar o mesmo IP público.',
+        ],
+        choices: [
+          {
+            id: 'a',
+            label: 'Que o acesso partiu de um dispositivo daquele IP, mas não identifica a pessoa.',
+            rationale:
+              'Parcialmente incorreto. Com CGNAT, o IP público pode representar vários dispositivos e assinantes. O endereço não individualiza nem o dispositivo.',
+          },
+          {
+            id: 'b',
+            label:
+              'Que houve uma conexão associada àquele IP público na janela, sem individualizar assinante, dispositivo ou pessoa.',
+            rationale:
+              'Correto. O registro documenta a conexão. A individualização exigiria correlação e outras fontes.',
+          },
+          {
+            id: 'c',
+            label: 'Que o titular da linha é o autor do acesso.',
+            rationale:
+              'Incorreto. Titularidade do contrato não prova quem operava o dispositivo nem que a pessoa tenha realizado o acesso.',
+          },
+          {
+            id: 'd',
+            label: 'Que o acesso não ocorreu, pois o IP é compartilhado.',
+            rationale:
+              'Incorreto. O compartilhamento limita a atribuição; não apaga o registro do acesso.',
+          },
+        ],
+        answerId: 'b',
+        explanation:
+          'O IP é um dado de conexão. Ele pode apoiar a correlação, mas não substitui a cadeia que levaria de um fluxo a um dispositivo e de um dispositivo a uma pessoa.',
+        referenceAnswer:
+          'O IP documenta um ponto de saída na janela; não individualiza assinante, dispositivo ou pessoa.',
+      },
+      {
+        id: 'IP-E2',
+        kind: 'classify',
+        objective: 'Separar o que os registros sustentam do que exigiria outras diligências.',
+        difficulty: 'avancado',
+        context:
+          'Você recebeu logs da aplicação, uma resposta da operadora sobre CGNAT, um auto de custódia e um exame de tablet. Classifique cada afirmação pelo suporte disponível.',
+        knowledge: ['Correlação NAT', 'Limites probatórios', 'Cadeia de custódia'],
+        support: 'Sustentado: há registro direto. Correlação adicional: há caminho técnico, mas falta dado. Extrapola: a afirmação vai além do que os registros permitem.',
+        challenge: 'A diferença entre “possível com diligência” e “sustentado agora” é central.',
+        steps: [
+          'Leia a afirmação e destaque o sujeito da conclusão.',
+          'Verifique se há registro direto para cada elemento.',
+          'Classifique antes de conferir as justificativas.',
+        ],
+        evidence: 'Para cada classificação, indique a fonte que a sustenta ou a diligência que falta.',
+        criteria: [
+          'Não confunde possibilidade técnica com demonstração.',
+          'Reconhece que a credencial coletiva não identifica o operador.',
+          'Não usa ausência de histórico como prova de não autoria.',
+        ],
+        prompt: 'Classifique cada afirmação conforme o suporte que o conjunto oferece.',
+        hints: [
+          '“Sustentado” exige registro direto, não apenas plausibilidade.',
+          'Uma diligência possível não torna a conclusão verdadeira hoje.',
+        ],
+        categories: [
+          { id: 'sustentado', label: 'Sustentado pelo conjunto', description: 'Há registro direto e compatível.' },
+          { id: 'correlacao', label: 'Exige correlação adicional', description: 'Há caminho técnico, mas falta dado ou diligência.' },
+          { id: 'extrapola', label: 'Extrapola os dados', description: 'A afirmação vai além do que as fontes permitem.' },
+        ],
+        items: [
+          {
+            id: 'a',
+            label: 'Houve conexão do IP público ao servidor na janela registrada.',
+            expectedCategoryId: 'sustentado',
+            rationale: 'Os logs da aplicação e do firewall registram as conexões na janela.',
+          },
+          {
+            id: 'b',
+            label: 'O IP público foi usado por mais de uma conexão no mesmo intervalo.',
+            expectedCategoryId: 'sustentado',
+            rationale: 'A resposta da operadora registra seis conexões no IP público.',
+          },
+          {
+            id: 'c',
+            label: 'Um assinante específico pode ser associado a um fluxo.',
+            expectedCategoryId: 'correlacao',
+            rationale: 'A correlação de porta, data e hora é tecnicamente possível, mas depende de registros da operadora.',
+          },
+          {
+            id: 'd',
+            label: 'A pessoa que digitou a senha é o assinante da linha.',
+            expectedCategoryId: 'extrapola',
+            rationale: 'Titularidade do contrato não identifica quem operava o dispositivo.',
+          },
+          {
+            id: 'e',
+            label: 'O tablet apreendido foi o único dispositivo capaz de acessar.',
+            expectedCategoryId: 'extrapola',
+            rationale: 'Não há inventário de dispositivos nem prova de exclusividade. O exame do tablet tem limites expressos.',
+          },
+          {
+            id: 'f',
+            label: 'O operador individual é identificado pela credencial de setor.',
+            expectedCategoryId: 'extrapola',
+            rationale: 'A credencial era compartilhada e o serviço não registrava o operador individual.',
+          },
+        ],
+        explanation:
+          'O conjunto sustenta o evento e o compartilhamento do IP. Ele não sustenta a individualização da pessoa. A correlação NAT pode reduzir a indeterminação, mas ainda não responde quem operava o dispositivo.',
+        referenceAnswer:
+          'Sustentado: conexão e múltiplos fluxos. Correlação adicional: associação a um assinante. Extrapola: autoria da pessoa, exclusividade do tablet e identificação pela credencial.',
+      },
+      {
+        id: 'IP-E3',
+        kind: 'match',
+        objective: 'Relacionar elementos técnicos aos seus limites de identificação.',
+        difficulty: 'intermediario',
+        context:
+          'Uma equipe precisa explicar, em linguagem técnica, o que cada elemento do registro permite e não permite afirmar.',
+        knowledge: ['IP público', 'CGNAT', 'Porta de origem', 'User-agent', 'Credencial'],
+        support: 'Associe cada elemento à descrição que melhor expressa sua função e seu limite.',
+        challenge: 'Não atribua a um elemento mais identidade do que ele carrega.',
+        steps: [
+          'Leia o elemento e pergunte qual é sua função técnica.',
+          'Identifique o limite que acompanha essa função.',
+          'Confira as correspondências antes de enviar.',
+        ],
+        evidence: 'Explique a diferença entre identificar um fluxo e identificar uma pessoa.',
+        criteria: [
+          'Diferencia IP de pessoa.',
+          'Explica o papel da porta e do horário.',
+          'Reconhece que user-agent e credencial coletiva têm limites.',
+        ],
+        prompt: 'Associe cada elemento à descrição correta de seu alcance.',
+        hints: [
+          'A porta ajuda a distinguir fluxos dentro de um mesmo endereço.',
+          'Uma credencial de setor registra o setor, não a pessoa.',
+        ],
+        left: [
+          { id: 'ip', label: 'IP público' },
+          { id: 'cgnat', label: 'CGNAT' },
+          { id: 'porta', label: 'Porta de origem' },
+          { id: 'ua', label: 'User-agent' },
+          { id: 'cred', label: 'Credencial compartilhada' },
+        ],
+        right: [
+          { id: 'r-ip', label: 'Identifica uma interface lógica em um instante, não uma pessoa.' },
+          { id: 'r-cgnat', label: 'Compartilha um IPv4 público e exige correlação de porta e horário.' },
+          { id: 'r-porta', label: 'Ajuda a distinguir fluxos, mas não identifica o operador.' },
+          { id: 'r-ua', label: 'Descreve software declarado; pode ser alterado e não individualiza o dispositivo.' },
+          { id: 'r-cred', label: 'Registra o setor ou perfil, não a pessoa que utilizou a conta.' },
+        ],
+        correctMatches: {
+          ip: 'r-ip',
+          cgnat: 'r-cgnat',
+          porta: 'r-porta',
+          ua: 'r-ua',
+          cred: 'r-cred',
+        },
+        explanation:
+          'A atribuição exige uma cadeia de correlações. Cada elemento contribui com uma parte e impõe um limite. Nenhum deles, isolado, prova autoria.',
+        referenceAnswer:
+          'IP: interface; CGNAT: compartilhamento; porta: distinção de fluxo; user-agent: software declarado; credencial: setor.',
+      },
+      {
+        id: 'IP-E4',
+        kind: 'short',
+        objective: 'Nomear a tecnologia de compartilhamento de endereços.',
+        difficulty: 'intermediario',
+        context:
+          'A operadora informa que vários assinantes compartilham o mesmo IPv4 público e que a associação exige correlação de porta e horário.',
+        knowledge: ['NAT', 'CGNAT', 'IPv4'],
+        support: 'A sigla aparece na resposta da operadora e designa a tradução de endereços em escala de operadora.',
+        challenge: 'Responda apenas com a sigla, sem confundir com NAT doméstico.',
+        steps: [
+          'Identifique a tecnologia descrita pela operadora.',
+          'Responda com a sigla correspondente.',
+          'Confira a grafia antes de enviar.',
+        ],
+        evidence: 'A resposta deve ser compatível com a descrição de compartilhamento em escala de operadora.',
+        criteria: ['Resposta correta: CGNAT.'],
+        prompt:
+          'Qual sigla designa a tradução de endereços em escala de operadora que permite compartilhar um IPv4 público entre vários assinantes?',
+        placeholder: 'Sigla',
+        accepted: ['cgnat'],
+        sampleAnswer: 'CGNAT',
+        hints: ['É uma forma de NAT aplicada pela operadora.', 'A sigla tem cinco letras.'],
+        explanation:
+          'CGNAT (Carrier-Grade NAT) permite que a operadora compartilhe endereços IPv4 públicos entre assinantes. A individualização exige correlação de porta, data e hora com registros internos.',
+        referenceAnswer: 'CGNAT.',
+      },
+    ],
+    takeaways: [
+      'IP localiza uma conexão; não identifica uma pessoa.',
+      'CGNAT exige correlação de porta, data e hora para chegar ao assinante.',
+      'Assinante, dispositivo e operador são camadas distintas.',
+      'Ausência de histórico não prova não autoria.',
+      'A conclusão pode ser tecnicamente correta ao afirmar que a autoria permanece indeterminada.',
+    ],
+  },
+  {
+    id: 'laudo-e-quesitos',
+    trackId: 'pericia',
+    moduleId: 'pericia-metodo',
+    order: 3,
+    title: 'Laudo, quesitos e limites da resposta',
+    eyebrow: 'Comunicar o que se pode sustentar',
+    summary:
+      'Estruture a resposta pericial, separe fato, inferência, limitação e diligência, e responda a quesitos sem transformar suspeita em certeza.',
+    minutes: 20,
+    difficulty: 'avancado',
+    competency: 'forense',
+    objectives: [
+      'Organizar um laudo com objeto, método, exame, análise, limites e conclusão.',
+      'Classificar enunciados pela camada de afirmação.',
+      'Responder a quesitos com fundamento verificável e linguagem calibrada.',
+    ],
+    prerequisites: [
+      'Do vestígio à evidência avaliável e O IP não é uma pessoa. Recomendado: Custódia, integridade e o que um hash prova.',
+    ],
+    blocks: [
+      {
+        kind: 'paragraph',
+        text: 'Um laudo não é um relatório de impressões. Ele precisa permitir que outra pessoa entenda o que foi examinado, como, com quais fontes e com que limites. A resposta a um quesito deve ser verificável: o leitor tem de conseguir localizar o registro que sustenta cada afirmação e identificar o que ficou fora do alcance do exame.',
+      },
+      {
+        kind: 'table',
+        headers: ['Seção', 'Pergunta que responde', 'Conteúdo típico'],
+        rows: [
+          ['Identificação e objeto', 'O que foi examinado e para quê?', 'Partes, material, escopo, quesitos e autorização.'],
+          ['Metodologia', 'Como o exame foi conduzido?', 'Método, ferramentas, cópias, hashes e normalização de tempo.'],
+          ['Exames e resultados', 'O que foi observado?', 'Registros, campos, horários, valores e respostas HTTP.'],
+          ['Análise', 'O que os resultados significam?', 'Correlação, hipóteses testadas e compatibilidade com o quesito.'],
+          ['Limitações', 'O que não foi possível verificar?', 'Recortes, lacunas de custódia, fusos, fontes ausentes e alcance.'],
+          ['Conclusão', 'O que pode ser sustentado?', 'Resposta sintética, grau de confiança e o que permanece indeterminado.'],
+          ['Anexos', 'Como verificar?', 'Extratos, hashes, termos, scripts e referências.'],
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'limite',
+        title: 'Conclusão não é resumo da suspeita',
+        text: 'Se o conjunto documenta o acesso, mas não individualiza a pessoa, a conclusão correta é essa. Dizer “não foi possível atribuir autoria” não é uma resposta incompleta: é uma resposta tecnicamente calibrada. O laudo perde credibilidade quando preenche a lacuna com a hipótese mais conveniente.',
+      },
+      {
+        kind: 'code',
+        label: 'Exemplo de resposta a quesito',
+        code: `QUESITO: O endereço IP identifica a pessoa que acessou o prontuário?
+RESPOSTA: Não. O IP público registrado era compartilhado por CGNAT.
+A operadora descreveu seis conexões na janela e não forneceu
+identidade civil ou dispositivo. A correlação de porta, data e hora
+pode apontar um assinante, mas não identifica a pessoa que operava
+o aparelho. A credencial utilizada era compartilhada por três
+profissionais e o serviço não registrava o operador individual.
+LIMITE: a resposta se baseia nos extratos disponíveis; a ampliação
+do exame e a correlação NAT poderiam reduzir a indeterminação, mas
+não autorizam concluir autoria sem outras fontes.`,
+      },
+      {
+        kind: 'heading',
+        text: 'Quatro camadas que não podem se misturar',
+      },
+      {
+        kind: 'list',
+        items: [
+          'Fato observado: o que o registro mostra, com fonte e horário.',
+          'Inferência técnica: o que o conjunto sugere, com justificativa e confiança.',
+          'Limitação: o que o método ou a fonte não alcança.',
+          'Diligência: o que poderia ser feito, com finalidade e cautela.',
+        ],
+      },
+      {
+        kind: 'callout',
+        tone: 'atencao',
+        title: 'Quesito não é convite a confirmar a hipótese',
+        text: 'Responda à pergunta formulada, não à pergunta que você gostaria que existisse. Se o quesito pressupõe um fato não demonstrado, a resposta deve apontar o pressuposto e explicar o que falta. Uma resposta bem escrita pode contrariar a expectativa de quem perguntou.',
+      },
+      {
+        kind: 'callout',
+        tone: 'nota',
+        title: 'Base normativa e escopo educacional',
+        text: 'O Código de Processo Penal trata do exame de corpo de delito e do laudo (art. 159 e seguintes) e da cadeia de custódia (arts. 158-A a 158-F). A Lei nº 12.965/2014 e a LGPD acrescentam limites ao tratamento de registros e dados pessoais. Este exercício é fictício e não produz laudo oficial nem orienta procedimento real.',
+      },
+    ],
+    exercises: [
+      {
+        id: 'LQ-E1',
+        kind: 'order',
+        objective: 'Sequenciar as seções de um laudo técnico.',
+        difficulty: 'avancado',
+        context:
+          'A equipe precisa organizar um laudo fictício sobre acesso indevido a um prontuário. A ordem deve permitir que o leitor reconstrua o exame.',
+        knowledge: ['Estrutura do laudo', 'Método pericial', 'Documentação'],
+        support: 'Comece pelo que foi examinado e pelo método; termine no que permite revisar o trabalho.',
+        challenge: 'A conclusão vem depois da análise e das limitações; anexos vêm ao final.',
+        steps: [
+          'Identifique a função de cada seção.',
+          'Coloque o objeto antes do método e o método antes dos resultados.',
+          'Deixe a conclusão para depois da análise e das limitações.',
+        ],
+        evidence: 'Explique por que a conclusão não deve vir antes das limitações.',
+        criteria: [
+          'Organiza objeto e metodologia antes dos resultados.',
+          'Declara limitações antes da conclusão.',
+          'Mantém anexos como material de verificação.',
+        ],
+        prompt: 'Ordene as seções de um laudo técnico pericial.',
+        hints: [
+          'O leitor precisa saber o que foi examinado antes de ver o resultado.',
+          'A conclusão sintetiza, mas não substitui a análise e as limitações.',
+        ],
+        items: [
+          { id: 'anexos', label: 'Anexos e elementos de verificação' },
+          { id: 'objeto', label: 'Identificação, objeto e quesitos' },
+          { id: 'conclusao', label: 'Conclusão e grau de confiança' },
+          { id: 'exames', label: 'Exames e resultados observados' },
+          { id: 'metodologia', label: 'Metodologia, cópias e integridade' },
+          { id: 'limitacoes', label: 'Limitações e lacunas' },
+          { id: 'analise', label: 'Análise e teste de hipóteses' },
+        ],
+        correctOrder: ['objeto', 'metodologia', 'exames', 'analise', 'limitacoes', 'conclusao', 'anexos'],
+        explanation:
+          'A sequência acompanha a construção do raciocínio: o que foi examinado, como, o que foi observado, o que significa, o que não foi possível concluir e, por fim, a resposta sintética com elementos de verificação.',
+        referenceAnswer:
+          'Objeto, metodologia, exames, análise, limitações, conclusão e anexos.',
+      },
+      {
+        id: 'LQ-E2',
+        kind: 'classify',
+        objective: 'Separar fato, inferência, limitação e diligência.',
+        difficulty: 'avancado',
+        context:
+          'Um laudo fictício precisa declarar cada enunciado na camada correta. A mistura de camadas é uma das principais fontes de conclusão frágil.',
+        knowledge: ['Camadas de afirmação', 'Redação pericial', 'Limites probatórios'],
+        support: 'Fato tem fonte e horário. Inferência interpreta. Limitação declara alcance. Diligência propõe ação.',
+        challenge: 'Uma frase verdadeira pode estar na camada errada se for apresentada como conclusão.',
+        steps: [
+          'Pergunte se o enunciado descreve registro, interpretação, lacuna ou ação futura.',
+          'Classifique todos os itens.',
+          'Compare com a justificativa de cada um.',
+        ],
+        evidence: 'Indique a fonte ou o motivo que sustenta cada classificação.',
+        criteria: [
+          'Distingue registro de interpretação.',
+          'Reconhece limitação como parte do laudo.',
+          'Não trata diligência como resultado já obtido.',
+        ],
+        prompt: 'Classifique cada enunciado pela camada de afirmação.',
+        hints: [
+          'Se a frase propõe uma ação futura, é diligência.',
+          'Se a frase declara o que a fonte não cobre, é limitação.',
+        ],
+        categories: [
+          { id: 'fato', label: 'Fato observado', description: 'Registro direto, com fonte e contexto.' },
+          { id: 'inferencia', label: 'Inferência técnica', description: 'Interpretação sustentada pelo conjunto.' },
+          { id: 'limitacao', label: 'Limitação', description: 'O que o exame ou a fonte não alcança.' },
+          { id: 'diligencia', label: 'Diligência', description: 'Ação proposta para reduzir incerteza.' },
+        ],
+        items: [
+          {
+            id: 'a',
+            label: 'O servidor registrou leitura do prontuário 014 às 22:41:07 BRT.',
+            expectedCategoryId: 'fato',
+            rationale: 'É um registro direto, com horário e fonte.',
+          },
+          {
+            id: 'b',
+            label: 'A operadora declarou que o IP público era compartilhado por CGNAT.',
+            expectedCategoryId: 'fato',
+            rationale: 'É o conteúdo documentado da resposta da operadora.',
+          },
+          {
+            id: 'c',
+            label: 'A autoria não pode ser individualizada com os dados disponíveis.',
+            expectedCategoryId: 'inferencia',
+            rationale: 'É uma conclusão interpretativa sustentada pelo conjunto de fontes.',
+          },
+          {
+            id: 'd',
+            label: 'O histórico do tablet não cobre navegação privada nem outros perfis.',
+            expectedCategoryId: 'limitacao',
+            rationale: 'Declara o alcance do exame e o que ele não observa.',
+          },
+          {
+            id: 'e',
+            label: 'Requisitar à operadora a correlação entre porta, data, hora e assinante.',
+            expectedCategoryId: 'diligencia',
+            rationale: 'É uma ação futura para reduzir a indeterminação.',
+          },
+          {
+            id: 'f',
+            label: 'O relógio do tablet estava três minutos adiantado.',
+            expectedCategoryId: 'fato',
+            rationale: 'É uma medição registrada no exame.',
+          },
+          {
+            id: 'g',
+            label: 'A ausência do domínio no histórico não prova que o acesso não ocorreu.',
+            expectedCategoryId: 'limitacao',
+            rationale: 'Delimita o que a ausência de registro permite concluir.',
+          },
+        ],
+        explanation:
+          'A separação permite que o leitor saiba o que é registro, o que é interpretação, o que ficou fora do alcance e o que poderia ser feito. Misturar camadas enfraquece a resposta e dificulta a revisão.',
+        referenceAnswer:
+          'Fatos: leitura registrada, CGNAT declarado e relógio adiantado. Inferência: autoria não individualizada. Limitações: alcance do histórico e ausência de registro. Diligência: correlação NAT.',
+      },
+      {
+        id: 'LQ-E3',
+        kind: 'multi',
+        objective: 'Selecionar elementos de uma resposta defensável sobre autoria.',
+        difficulty: 'avancado',
+        context:
+          'Você precisa responder a um quesito sobre a autoria de um acesso. A resposta será lida por quem espera uma conclusão, mas também por quem pode revisar o método.',
+        knowledge: ['Quesitos', 'Atribuição', 'Confiança', 'Diligências'],
+        support: 'Uma resposta defensável distingue o que foi documentado do que permanece indeterminado e explica o caminho para ir além.',
+        challenge: 'Não confunda firmeza de linguagem com força probatória.',
+        steps: [
+          'Verifique o que o conjunto documenta.',
+          'Identifique o que não pode ser individualizado.',
+          'Inclua limites e diligências proporcionais.',
+        ],
+        evidence: 'Cada item selecionado deve corresponder a uma parte verificável da resposta.',
+        criteria: [
+          'Inclui o fato documentado.',
+          'Declara a indeterminação.',
+          'Propõe diligências sem prometer resultado.',
+        ],
+        prompt: 'Quais elementos devem constar em uma resposta defensável sobre autoria?',
+        hints: [
+          'Uma resposta responsável pode concluir que a autoria permanece indeterminada.',
+          'Diligência não é prova; é caminho possível.',
+        ],
+        choices: [
+          {
+            id: 'a',
+            label: 'O que os registros documentam sobre o acesso e em qual janela.',
+            rationale: 'Correto. A resposta precisa delimitar o fato técnico demonstrado.',
+          },
+          {
+            id: 'b',
+            label: 'O que não pode ser individualizado e por quê.',
+            rationale: 'Correto. A indeterminação faz parte da conclusão e deve ser justificada.',
+          },
+          {
+            id: 'c',
+            label: 'Quais diligências poderiam reduzir a indeterminação, com seus limites.',
+            rationale: 'Correto. Diligências proporcionais e verificáveis tornam a resposta acionável.',
+          },
+          {
+            id: 'd',
+            label: 'O grau de confiança e os limites do exame.',
+            rationale: 'Correto. Confiança calibrada e limitações explícitas sustentam a credibilidade do laudo.',
+          },
+          {
+            id: 'e',
+            label: 'O nome do suspeito como conclusão, mesmo sem suporte técnico.',
+            rationale: 'Incorreto. Suspeita não é atribuição e não pode ocupar o lugar da prova.',
+          },
+          {
+            id: 'f',
+            label: 'A afirmação de que o IP, sozinho, prova a autoria.',
+            rationale: 'Incorreto. O IP não individualiza pessoa, especialmente em CGNAT.',
+          },
+        ],
+        correctIds: ['a', 'b', 'c', 'd'],
+        explanation:
+          'A resposta defensável combina o fato documentado, a indeterminação justificada, as diligências possíveis e a calibração da confiança. Ela não substitui análise por adjetivos.',
+        referenceAnswer:
+          'Fato documentado, indeterminação justificada, diligências proporcionais e confiança com limites.',
+      },
+      {
+        id: 'LQ-E4',
+        kind: 'short',
+        objective: 'Nomear a seção adequada para declarar lacunas.',
+        difficulty: 'intermediario',
+        context:
+          'Um laudo precisa registrar que o histórico examinado não cobre todos os perfis e que a custódia tem campos em branco.',
+        knowledge: ['Estrutura do laudo', 'Limitações', 'Transparência'],
+        support: 'A seção responde ao que não foi possível verificar e ao alcance do exame.',
+        challenge: 'Responda apenas com o nome da seção.',
+        steps: [
+          'Identifique a natureza dos enunciados: lacunas e alcance.',
+          'Localize a seção correspondente na estrutura do laudo.',
+          'Responda com o nome da seção.',
+        ],
+        evidence: 'A seção deve declarar recortes, fusos não verificados e dados ausentes.',
+        criteria: ['Resposta correta: limitações.'],
+        prompt:
+          'Em qual seção do laudo devem ser declarados recortes, fusos não verificados e dados ausentes?',
+        placeholder: 'Nome da seção',
+        accepted: ['limitacoes', 'limitacoes e incertezas'],
+        sampleAnswer: 'Limitações',
+        hints: [
+          'Não é a conclusão; é a seção que condiciona o alcance dela.',
+          'A palavra começa com “limita”.',
+        ],
+        explanation:
+          'As limitações declaram o que o exame não alcança. Sem essa seção, a conclusão parece mais ampla do que os dados permitem.',
+        referenceAnswer: 'Limitações.',
+      },
+    ],
+    takeaways: [
+      'O laudo organiza objeto, método, exame, análise, limites, conclusão e anexos.',
+      'Fato, inferência, limitação e diligência são camadas distintas.',
+      'Uma conclusão pode ser correta ao afirmar que a autoria permanece indeterminada.',
+      'Quesitos exigem resposta verificável, não confirmação da suspeita.',
+    ],
+  },
+  {
     id: 'codificacao-hash-cifra',
     trackId: 'criptografia',
     moduleId: 'cripto-fundamentos',
@@ -1509,26 +2404,28 @@ export const tracks: Track[] = [
     title: 'Perícia Digital e Forense de Redes',
     tagline: 'Método, integridade e conclusões que resistem à revisão.',
     description:
-      'O eixo central da plataforma. Custódia, integridade, correlação de fontes e um caso completo com relatório e rubrica.',
+      'O eixo central da plataforma. Custódia, integridade, correlação de fontes e dois casos completos, incluindo um cenário em que a autoria permanece indeterminada.',
     competency: ['forense', 'seguranca', 'diagnostico'],
-    outcome: 'Reconstruir um incidente a partir de fontes múltiplas, separar fato de inferência e comunicar limitações.',
+    outcome:
+      'Reconstruir um incidente a partir de fontes múltiplas, separar fato de inferência, comunicar limitações e reconhecer quando a autoria não pode ser individualizada.',
     modules: [
       {
         id: 'pericia-metodo',
         title: 'Método pericial',
-        summary: 'Custódia, integridade e o caso do portal indisponível.',
+        summary: 'Custódia, exame, laudo e o caso do portal indisponível.',
         status: 'disponivel',
-        lessonIds: ['custodia-integridade'],
+        lessonIds: ['custodia-integridade', 'vestigio-evidencia', 'laudo-e-quesitos'],
         caseIds: ['portal-fora-do-ar'],
         labIds: ['lab-trafego'],
       },
       {
         id: 'pericia-casos',
-        title: 'Casos combinados',
+        title: 'Atribuição e limites',
         summary:
-          'Integridade de arquivo, exfiltração, movimentação lateral e casos sem conclusão possível. Em preparação.',
-        status: 'em-expansao',
-        lessonIds: [],
+          'CGNAT, credencial coletiva, custódia incompleta e o caso criminal em que o IP não identifica uma pessoa.',
+        status: 'disponivel',
+        lessonIds: ['ip-nao-e-pessoa'],
+        caseIds: ['autoria-e-o-ip'],
       },
     ],
   },

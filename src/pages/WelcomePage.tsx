@@ -18,7 +18,7 @@ export function WelcomePage() {
     return (
       <div className="welcome welcome--recovery">
         <div className="welcome__copy">
-          <h1>Conta local criada.</h1>
+          <h1>Conta criada.</h1>
           <p>
             O progresso anterior foi associado à sua conta. Guarde o código de recuperação abaixo;
             ele permite redefinir a senha sem e-mail. A orientação inicial não será repetida porque
@@ -108,8 +108,8 @@ export function WelcomePage() {
         </ul>
         <p className="welcome__local">
           <ShieldCheck size={16} aria-hidden="true" />
-          Conta e progresso ficam neste computador. O nível orienta o início; ele não libera
-          automaticamente um caso avançado.
+          A conta e o progresso ficam associados ao seu usuário. O nível orienta o início; ele não
+          libera automaticamente um caso avançado.
         </p>
       </section>
 
@@ -117,7 +117,7 @@ export function WelcomePage() {
         <aside className="welcome__recovery" aria-labelledby="recovery-title">
           <div>
             <h2 id="recovery-title">
-              <KeyRound size={18} aria-hidden="true" /> Código de recuperação local
+              <KeyRound size={18} aria-hidden="true" /> Código de recuperação
             </h2>
             <p>{recoveryReceipt.recoveryNotice}</p>
           </div>

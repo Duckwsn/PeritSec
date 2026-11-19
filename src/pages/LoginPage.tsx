@@ -34,7 +34,7 @@ export function LoginPage() {
       <AuthShell>
         <div className="auth-loading" role="status">
           <span className="auth-loading__mark" aria-hidden="true" />
-          <p>Verificando a instalação local…</p>
+          <p>Verificando sua sessão…</p>
         </div>
       </AuthShell>
     )
@@ -74,14 +74,14 @@ export function LoginPage() {
         <div className="auth-page__copy">
           <h1 className="text-balance">Entre para continuar sua jornada.</h1>
           <p className="auth-page__lede">
-            Seu progresso, suas competências e seu histórico de investigação ficam separados por
-            conta nesta instalação. O PeritSec não usa e-mail, nuvem ou login externo.
+            Seu progresso, suas competências e seu histórico de investigação ficam associados à sua
+            conta. O acesso usa apenas usuário e senha, sem e-mail, OAuth ou login externo.
           </p>
           <div className="auth-page__note">
             <ShieldCheck size={18} aria-hidden="true" />
             <p>
-              As contas pertencem a este computador. Uma senha local organiza o acesso dentro do
-              aplicativo; ela não substitui a proteção da sua conta do Windows.
+              A senha protege sua conta no PeritSec. Ela não substitui a proteção do dispositivo que
+              você usa para acessar a plataforma.
             </p>
           </div>
         </div>
@@ -91,8 +91,8 @@ export function LoginPage() {
             <div className="auth-first-access">
               <h2>Primeiro acesso</h2>
               <p>
-                Esta instalação ainda não tem nenhuma conta. Crie a primeira conta local para
-                começar e, se quiser, traga o progresso que já existe neste computador.
+                Ainda não há contas cadastradas. Crie a primeira conta para começar e, se quiser,
+                importe um progresso anterior.
               </p>
               <Link className="button button--primary button--full" to="/criar-conta">
                 Criar a primeira conta
@@ -156,7 +156,7 @@ export function LoginPage() {
                   Esqueci minha senha
                 </Link>
                 <Link className="text-link" to="/criar-conta">
-                  Criar outra conta local
+                  Criar outra conta
                 </Link>
               </div>
               <p className="auth-page__local-note">

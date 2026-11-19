@@ -138,3 +138,104 @@ describe('caso Portal fora do ar', () => {
     expect(steps.find((step) => step.id === 'report')?.complete).toBe(false)
   })
 })
+
+function criminalCase(): CaseDefinition {
+  const definition = getCaseById('autoria-e-o-ip')
+  if (!definition) throw new Error('Caso criminal ausente.')
+  return definition
+}
+
+function completeCriminalProgress(definition: CaseDefinition): CaseProgress {
+  const empty = createEmptyCaseProgress()
+  return {
+    ...empty,
+    evidenceOpened: definition.evidence.map((item) => item.id),
+    evidenceSelection: [...definition.evidenceSelectionCorrectIds],
+    notes: {
+      'E-01': 'Log registra leitura do prontuário 014 às 22:41:07 BRT a partir do IP público.',
+      'E-03': 'Operadora declara CGNAT e seis conexões no IP público na janela.',
+      'E-05': 'Auto documenta lacre e método, mas deixa transferências e relógios em branco.',
+    },
+    timeline: definition.timeline.map((event) => event.id),
+    hypotheses: Object.fromEntries(
+      definition.hypotheses.map((hypothesis) => [hypothesis.id, hypothesis.expected]),
+    ),
+    conclusionId: definition.correctConclusionId,
+    confidence: 'media',
+    unsupportedClaimId: definition.unsupportedClaimId,
+    report: { ...definition.referenceReport },
+    custodyChecks: Object.fromEntries(
+      (definition.custodyChecklist ?? []).map((item) => [item.id, item.expected]),
+    ),
+    quesitos: Object.fromEntries(
+      (definition.quesitos ?? []).map((quesito) => [quesito.id, quesito.referenceAnswer]),
+    ),
+  }
+}
+
+describe('caso Autoria e o IP', () => {
+  it('mantém integridade das cópias e oito fases explícitas', () => {
+    const definition = criminalCase()
+    expect(definition.evidence).toHaveLength(8)
+    expect(definition.phases).toHaveLength(8)
+    expect(definition.evidenceSelectionCorrectIds).toEqual(['E-01', 'E-03', 'E-07'])
+    for (const item of definition.evidence) {
+      expect(sha256Hex(item.content)).toBe(item.hash)
+    }
+    const rubric = definition.rubric
+    const total = Object.values(rubric ?? {}).reduce((sum, value) => sum + value, 0)
+    expect(total).toBe(100)
+  })
+
+  it('mantém a autoria indeterminada e rejeita o IP como prova isolada', () => {
+    const definition = criminalCase()
+    const correct = definition.conclusionOptions.find(
+      (option) => option.id === definition.correctConclusionId,
+    )
+    expect(correct?.label).toMatch(/não individualizam pessoa ou dispositivo/i)
+    expect(definition.unsupportedClaimId).toBe('U-01')
+    expect(definition.hypotheses.find((hypothesis) => hypothesis.id === 'H-01')?.expected).toBe(
+      'refuted',
+    )
+    expect(definition.hypotheses.find((hypothesis) => hypothesis.id === 'H-02')?.expected).toBe(
+      'supported',
+    )
+  })
+
+  it('atinge 100/100 com custódia e quesitos completos e preserva a rubrica de 100', () => {
+    const definition = criminalCase()
+    const progress = completeCriminalProgress(definition)
+    const evaluation = evaluateCase(definition, progress)
+    expect(evaluation.score).toBe(100)
+    expect(evaluation.criteria.map((criterion) => criterion.max).reduce((a, b) => a + b, 0)).toBe(
+      100,
+    )
+    expect(evaluation.criteria.find((criterion) => criterion.id === 'quesitos')?.earned).toBe(20)
+    expect(evaluation.criteria.find((criterion) => criterion.id === 'custody')?.earned).toBe(10)
+    expect(validateCaseSubmission(definition, progress)).toEqual({ valid: true, missing: [] })
+    expect(caseStepStatus(definition, progress).every((step) => step.complete)).toBe(true)
+  })
+
+  it('penaliza tratar o IP como autoria e deixa quesitos pendentes', () => {
+    const definition = criminalCase()
+    const progress = completeCriminalProgress(definition)
+    const invalid = {
+      ...progress,
+      conclusionId: 'C-01',
+      custodyChecks: { ...progress.custodyChecks, 'C-04': 'documented' as const },
+      quesitos: { ...progress.quesitos, 'Q-01': 'O IP identifica o autor.' },
+    }
+    const evaluation = evaluateCase(definition, invalid)
+    expect(evaluation.score).toBeLessThan(100)
+    expect(evaluation.criteria.find((criterion) => criterion.id === 'cause')?.earned).toBe(0)
+    expect(evaluation.criteria.find((criterion) => criterion.id === 'custody')?.earned).toBeLessThan(
+      10,
+    )
+    expect(
+      evaluation.criteria.find((criterion) => criterion.id === 'quesitos')?.earned,
+    ).toBeLessThan(20)
+    const validation = validateCaseSubmission(definition, invalid)
+    expect(validation.valid).toBe(false)
+    expect(validation.missing.join(' ')).toContain('quesitos')
+  })
+})

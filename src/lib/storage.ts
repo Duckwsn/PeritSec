@@ -95,7 +95,7 @@ async function readData(response: Response): Promise<unknown> {
 export async function fetchRemoteProgress(): Promise<RemoteProgressResult> {
   const response = await requestJson('/api/progress')
   if (!response) {
-    return { status: 'unavailable', error: 'servidor local não respondeu' }
+    return { status: 'unavailable', error: 'serviço não respondeu' }
   }
   const data = await readData(response)
   if (response.status === 404) {
@@ -132,7 +132,7 @@ export async function saveRemoteProgress(
     method: 'PUT',
     body: JSON.stringify({ accountId, progress }),
   })
-  if (!response) return { ok: false, error: 'servidor local não respondeu' }
+  if (!response) return { ok: false, error: 'serviço não respondeu' }
   const data = await readData(response)
   if (!response.ok) {
     return {
@@ -151,7 +151,7 @@ export async function saveRemoteProgress(
 
 export async function createRemoteBackup(): Promise<BackupCreateResult> {
   const response = await requestJson('/api/backups', { method: 'POST', body: '{}' })
-  if (!response) return { ok: false, error: 'servidor local não respondeu' }
+  if (!response) return { ok: false, error: 'serviço não respondeu' }
   const data = await readData(response)
   if (!response.ok) {
     return { ok: false, error: parseError(data, `HTTP ${response.status}`) }
@@ -178,7 +178,7 @@ export async function restoreRemoteBackup(id: number): Promise<BackupRestoreResu
     method: 'POST',
     body: '{}',
   })
-  if (!response) return { ok: false, error: 'servidor local não respondeu' }
+  if (!response) return { ok: false, error: 'serviço não respondeu' }
   const data = await readData(response)
   if (!response.ok) {
     return { ok: false, error: parseError(data, `HTTP ${response.status}`) }

@@ -22,7 +22,7 @@ export function RecoverPage() {
       <AuthShell>
         <div className="auth-loading" role="status">
           <span className="auth-loading__mark" aria-hidden="true" />
-          <p>Verificando a instalação local…</p>
+          <p>Verificando o serviço…</p>
         </div>
       </AuthShell>
     )
@@ -64,8 +64,8 @@ export function RecoverPage() {
         <div className="auth-page__copy">
           <h1 className="text-balance">Redefinir o acesso sem e-mail.</h1>
           <p className="auth-page__lede">
-            Cada conta local recebe um código de recuperação quando é criada. Ele permite definir
-            uma nova senha neste computador. Se você perdeu o código, a conta pode ser recriada, mas
+            Cada conta recebe um código de recuperação quando é criada. Ele permite definir
+            uma nova senha. Se você perdeu o código, a conta pode ser recriada, mas
             o histórico anterior não pode ser recuperado sem uma cópia de backup.
           </p>
           <div className="auth-page__note">

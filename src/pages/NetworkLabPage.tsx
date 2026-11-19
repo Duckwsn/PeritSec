@@ -1043,7 +1043,7 @@ function NetworkLabExperience() {
             {selectedDevice?.kind === 'router' && (
               <div className="device-inspector">
                 <span className="label">Interfaces</span>
-                <div className="table-wrap">
+                <div className="table-wrap" tabIndex={0}>
                   <table className="data-table data-table--compact">
                     <thead>
                       <tr>
@@ -1161,8 +1161,8 @@ function NetworkLabExperience() {
               </ol>
             )}
             <p className="intervention-note">
-              O registro é local e pertence a esta sessão do laboratório. Ele não é um laudo nem
-              substitui documentação de um ambiente real.
+              O registro pertence a esta sessão do laboratório. Ele não é um laudo nem substitui
+              documentação de um ambiente real.
             </p>
           </section>
 

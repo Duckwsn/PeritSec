@@ -99,6 +99,8 @@ export interface CaseSubmission {
 
 export type HypothesisVerdict = 'supported' | 'refuted' | 'insufficient'
 
+export type CustodyMark = 'documented' | 'missing' | ''
+
 export interface CaseProgress {
   evidenceOpened: string[]
   notes: Record<string, string>
@@ -109,6 +111,8 @@ export interface CaseProgress {
   confidence: '' | 'alta' | 'media' | 'baixa'
   unsupportedClaimId: string
   report: CaseReport
+  custodyChecks: Record<string, CustodyMark>
+  quesitos: Record<string, string>
   submitted?: CaseSubmission
   actions: Array<{ at: string; label: string }>
 }
@@ -147,6 +151,8 @@ export function createEmptyCaseProgress(): CaseProgress {
     confidence: '',
     unsupportedClaimId: '',
     report: { facts: '', inference: '', limitations: '', recommendations: '' },
+    custodyChecks: {},
+    quesitos: {},
     actions: [],
   }
 }
@@ -280,7 +286,29 @@ export function applyLabCompletion(
 }
 
 export function getCaseProgress(state: ProgressState, caseId: string): CaseProgress {
-  return state.cases[caseId] ?? createEmptyCaseProgress()
+  const stored = state.cases[caseId]
+  if (!stored) return createEmptyCaseProgress()
+  return normalizeCaseProgress(stored)
+}
+
+function normalizeCaseProgress(record: Partial<CaseProgress>): CaseProgress {
+  const empty = createEmptyCaseProgress()
+  return {
+    ...empty,
+    ...record,
+    evidenceOpened: Array.isArray(record.evidenceOpened) ? record.evidenceOpened : [],
+    notes: record.notes ?? {},
+    evidenceSelection: Array.isArray(record.evidenceSelection) ? record.evidenceSelection : [],
+    timeline: Array.isArray(record.timeline) ? record.timeline : [],
+    hypotheses: record.hypotheses ?? {},
+    conclusionId: record.conclusionId ?? '',
+    confidence: record.confidence ?? '',
+    unsupportedClaimId: record.unsupportedClaimId ?? '',
+    report: { ...empty.report, ...record.report },
+    custodyChecks: record.custodyChecks ?? {},
+    quesitos: record.quesitos ?? {},
+    actions: Array.isArray(record.actions) ? record.actions : [],
+  }
 }
 
 export function updateCaseProgress(

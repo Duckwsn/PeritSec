@@ -455,7 +455,7 @@ function TrafficLabExperience() {
             <div>
               <strong>Laboratório concluído</strong>
               <p>
-                Registro local em {formatDateTime(completedRecord.completedAt)}. Você pode refazer as
+                Concluído em {formatDateTime(completedRecord.completedAt)}. Você pode refazer as
                 questões; a conclusão permanece no histórico.
               </p>
             </div>

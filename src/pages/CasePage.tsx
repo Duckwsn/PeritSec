@@ -16,6 +16,7 @@ import {
   Info,
   RotateCcw,
   Save,
+  Scale,
   ShieldCheck,
   TriangleAlert,
 } from 'lucide-react'
@@ -30,11 +31,14 @@ import { useEnterContent } from '../hooks/useEnterContent'
 import { ContentGate } from '../components/ContentGate'
 import {
   CASE_PASS_SCORE,
+  casePhaseStatus,
+  caseRubricItems,
   caseStepStatus,
   evaluateCase,
   evidenceKindLabel,
   validateCaseSubmission,
   type CaseCriterion,
+  type CaseDefinition,
   type SubmissionValidation,
 } from '../lib/caseEngine'
 import { sha256Hex } from '../lib/crypto'
@@ -42,20 +46,44 @@ import {
   formatDateTime,
   getCaseProgress,
   type CaseProgress,
+  type CustodyMark,
   type HypothesisVerdict,
 } from '../lib/progress'
 import { Tag } from '../components/ui'
 
-type CaseTab = 'dossie' | 'evidencias' | 'registro' | 'analise' | 'linha' | 'relatorio'
+type CaseTab =
+  | 'dossie'
+  | 'custodia'
+  | 'evidencias'
+  | 'registro'
+  | 'analise'
+  | 'linha'
+  | 'quesitos'
+  | 'relatorio'
 
-const tabs: Array<{ id: CaseTab; label: string; stepId?: string }> = [
-  { id: 'dossie', label: 'Dossiê' },
-  { id: 'evidencias', label: 'Evidências', stepId: 'evidence' },
-  { id: 'registro', label: 'Registro', stepId: 'record' },
-  { id: 'analise', label: 'Hipóteses', stepId: 'analysis' },
-  { id: 'linha', label: 'Linha do tempo', stepId: 'timeline' },
-  { id: 'relatorio', label: 'Conclusão', stepId: 'report' },
-]
+interface CaseTabDefinition {
+  id: CaseTab
+  label: string
+  stepId?: string
+}
+
+function caseTabs(caseDefinition: CaseDefinition): CaseTabDefinition[] {
+  const labels = caseDefinition.copy?.tabLabels ?? {}
+  return [
+    { id: 'dossie', label: labels.dossie ?? 'Dossiê' },
+    ...(caseDefinition.custodyChecklist?.length
+      ? [{ id: 'custodia' as const, label: labels.custodia ?? 'Custódia', stepId: 'custody' }]
+      : []),
+    { id: 'evidencias', label: labels.evidencias ?? 'Evidências', stepId: 'evidence' },
+    { id: 'registro', label: labels.registro ?? 'Registro', stepId: 'record' },
+    { id: 'analise', label: labels.analise ?? 'Hipóteses', stepId: 'analysis' },
+    { id: 'linha', label: labels.linha ?? 'Linha do tempo', stepId: 'timeline' },
+    ...(caseDefinition.quesitos?.length
+      ? [{ id: 'quesitos' as const, label: labels.quesitos ?? 'Quesitos', stepId: 'quesitos' }]
+      : []),
+    { id: 'relatorio', label: labels.relatorio ?? 'Conclusão', stepId: 'report' },
+  ]
+}
 
 const verdictLabels: Record<HypothesisVerdict, string> = {
   supported: 'Sustentada',
@@ -67,6 +95,11 @@ const confidenceLabels = {
   alta: 'Alta',
   media: 'Média',
   baixa: 'Baixa',
+}
+
+const custodyMarkLabels: Record<Exclude<CustodyMark, ''>, string> = {
+  documented: 'Documentado',
+  missing: 'Não documentado',
 }
 
 export function CasePage() {
@@ -114,25 +147,43 @@ function CaseExperience() {
   const [validation, setValidation] = useState<SubmissionValidation | null>(null)
   const [showReset, setShowReset] = useState(false)
   const [savedTimeline, setSavedTimeline] = useState(false)
+  const initialTimelineOrder =
+    caseDefinition?.timelineInitialOrder ?? CASE_TIMELINE_INITIAL_ORDER
   const [timelineOrder, setTimelineOrder] = useState<string[]>(() =>
     caseProgress?.timeline.length === (caseDefinition?.timeline.length ?? 0)
       ? caseProgress.timeline
-      : CASE_TIMELINE_INITIAL_ORDER,
+      : initialTimelineOrder,
   )
 
   if (!caseDefinition || !caseProgress) return <Navigate to="/nao-encontrado" replace />
   const activeCase = caseDefinition
   const activeProgress = caseProgress
-
+  const tabs = caseTabs(activeCase)
+  const copy = activeCase.copy ?? {}
+  const conclusionLabel = copy.conclusionLabel ?? 'Causa técnica provável'
+  const unsupportedLabel = copy.unsupportedLabel ?? 'Afirmação não sustentada'
+  const reportMinLength = activeCase.reportMinLength ?? 60
+  const reportFieldLabels = copy.reportFieldLabels ?? {}
+  const rubricItems = caseRubricItems(activeCase)
 
   const submitted = activeProgress.submitted
   const steps = caseStepStatus(activeCase, activeProgress)
+  const phases = casePhaseStatus(activeCase, activeProgress)
   const selectedEvidence = activeCase.evidence.find(
     (evidence) => evidence.id === selectedEvidenceId,
   )
   const evidenceSelection = new Set(activeProgress.evidenceSelection)
   const notesCount = Object.values(activeProgress.notes).filter((note) => note.trim().length > 0)
     .length
+  const custodyItems = activeCase.custodyChecklist ?? []
+  const custodyAnswered = custodyItems.filter((item) =>
+    Boolean(activeProgress.custodyChecks[item.id]),
+  ).length
+  const quesitos = activeCase.quesitos ?? []
+  const quesitosAnswered = quesitos.filter(
+    (quesito) =>
+      (activeProgress.quesitos[quesito.id] ?? '').trim().length >= quesito.minLength,
+  ).length
 
   function changeTab(tab: CaseTab) {
     setActiveTab(tab)
@@ -224,6 +275,24 @@ function CaseExperience() {
     )
   }
 
+  function setCustodyMark(itemId: string, mark: Exclude<CustodyMark, ''>) {
+    updateCase(
+      activeCase.id,
+      (current) => ({
+        ...current,
+        custodyChecks: { ...current.custodyChecks, [itemId]: mark },
+      }),
+      `Item de custódia ${itemId} avaliado como “${custodyMarkLabels[mark]}”.`,
+    )
+  }
+
+  function updateQuesito(quesitoId: string, value: string) {
+    updateCase(activeCase.id, (current) => ({
+      ...current,
+      quesitos: { ...current.quesitos, [quesitoId]: value },
+    }))
+  }
+
   function moveTimeline(index: number, direction: -1 | 1) {
     const target = index + direction
     if (target < 0 || target >= timelineOrder.length) return
@@ -279,7 +348,7 @@ function CaseExperience() {
     setIntegrityStatus({})
     setValidation(null)
     setShowReset(false)
-    setTimelineOrder(CASE_TIMELINE_INITIAL_ORDER)
+    setTimelineOrder(initialTimelineOrder)
     setSavedTimeline(false)
     changeTab('dossie')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -301,26 +370,48 @@ function CaseExperience() {
       '',
       '> Exercício educacional com dados sintéticos. Não representa perícia real.',
       '',
-      '## Causa técnica provável',
+      `## ${conclusionLabel}`,
       conclusion?.label ?? '(não selecionada)',
       '',
       `Grau de confiança: ${activeProgress.confidence ? confidenceLabels[activeProgress.confidence] : '(não informado)'}.`,
       '',
-      '## Fatos observados',
+      `## ${reportFieldLabels.facts ?? 'Fatos observados'}`,
       activeProgress.report.facts,
       '',
-      '## Inferência técnica',
+      `## ${reportFieldLabels.inference ?? 'Inferência técnica'}`,
       activeProgress.report.inference,
       '',
-      '## Limitações',
+      `## ${reportFieldLabels.limitations ?? 'Limitações'}`,
       activeProgress.report.limitations,
       '',
-      '## Recomendações',
+      `## ${reportFieldLabels.recommendations ?? 'Recomendações'}`,
       activeProgress.report.recommendations,
       '',
-      '## Afirmação não sustentada',
+      `## ${unsupportedLabel}`,
       unsupported?.label ?? '(não selecionada)',
       '',
+      ...(custodyItems.length > 0
+        ? [
+            '## Custódia e integridade',
+            ...custodyItems.map((item) => {
+              const mark = activeProgress.custodyChecks[item.id]
+              return `- ${item.id} · ${item.label}: ${
+                mark ? custodyMarkLabels[mark] : '(não avaliado)'
+              }`
+            }),
+            '',
+          ]
+        : []),
+      ...(quesitos.length > 0
+        ? [
+            '## Respostas aos quesitos',
+            ...quesitos.flatMap((quesito) => [
+              `### ${quesito.id} — ${quesito.prompt}`,
+              activeProgress.quesitos[quesito.id] ?? '(não respondido)',
+              '',
+            ]),
+          ]
+        : []),
       '## Avaliação por critério',
       ...submitted.breakdown.map(
         (criterion) => `- ${criterion.label}: ${criterion.earned}/${criterion.max}`,
@@ -370,10 +461,10 @@ function CaseExperience() {
         <div className="case-head__status">
           <span className="mono">Andamento</span>
           <div className="case-head__steps">
-            {steps.map((step) => (
-              <span key={step.id} className={step.complete ? 'is-complete' : ''}>
+            {phases.map((phase) => (
+              <span key={phase.id} className={phase.complete ? 'is-complete' : ''}>
                 <span className="case-head__step-dot" aria-hidden="true" />
-                {step.label}
+                {phase.label}
               </span>
             ))}
           </div>
@@ -456,6 +547,29 @@ function CaseExperience() {
                   ))}
                 </ul>
               </section>
+              {activeCase.legalReferences && activeCase.legalReferences.length > 0 && (
+                <section>
+                  <h2>Base normativa para estudo</h2>
+                  <p className="legal-refs__intro">
+                    Referências oficiais úteis para interpretar custódia, registros e dados
+                    pessoais. A leitura não substitui orientação jurídica nem transforma este
+                    exercício em perícia oficial.
+                  </p>
+                  <ul className="legal-refs">
+                    {activeCase.legalReferences.map((reference) => (
+                      <li key={`${reference.href}-${reference.label}`}>
+                        <Scale size={15} aria-hidden="true" />
+                        <div>
+                          <a href={reference.href} target="_blank" rel="noreferrer">
+                            {reference.label}
+                          </a>
+                          <p>{reference.description}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
               <section>
                 <div className="section-minihead">
                   <div>
@@ -530,7 +644,7 @@ function CaseExperience() {
                   </ol>
                 )}
                 <p className="case-log-note">
-                  O registro acompanha o rascunho do caso no armazenamento local ativo.
+                  O registro acompanha o andamento do caso e fica associado à sua conta.
                 </p>
               </div>
               <div className="case-side-panel case-side-panel--note">
@@ -539,6 +653,82 @@ function CaseExperience() {
                 <p>{activeCase.integrityNote}</p>
               </div>
             </aside>
+          </div>
+        )}
+
+        {activeTab === 'custodia' && custodyItems.length > 0 && (
+          <div>
+            <div className="case-section-head">
+              <div>
+                <h2>Custódia e integridade</h2>
+                <p>
+                  Marque o que os autos efetivamente documentam e o que está ausente. A pergunta não
+                  é se a etapa deveria ter sido feita, mas se ela pode ser demonstrada pelo material
+                  disponível.
+                </p>
+              </div>
+              <Tag tone={custodyAnswered === custodyItems.length ? 'green' : 'neutral'}>
+                {custodyAnswered} de {custodyItems.length} itens avaliados
+              </Tag>
+            </div>
+
+            <div className="custody-list">
+              {custodyItems.map((item) => {
+                const mark = activeProgress.custodyChecks[item.id] ?? ''
+                const correct = mark === item.expected
+                return (
+                  <article
+                    className={`custody-item ${mark ? 'is-answered' : ''} ${
+                      submitted ? (correct ? 'is-correct' : 'is-wrong') : ''
+                    }`}
+                    key={item.id}
+                  >
+                    <div className="custody-item__head">
+                      <span className="mono">{item.id}</span>
+                      <div>
+                        <h3>{item.label}</h3>
+                        <p>{item.detail}</p>
+                      </div>
+                      {submitted && (
+                        <Tag tone={correct ? 'green' : 'rust'}>
+                          {correct ? 'correta' : 'rever'}
+                        </Tag>
+                      )}
+                    </div>
+                    <fieldset className="custody-options" disabled={Boolean(submitted)}>
+                      <legend className="sr-only">Custódia do item {item.id}</legend>
+                      {(
+                        Object.keys(custodyMarkLabels) as Array<
+                          Exclude<CustodyMark, ''>
+                        >
+                      ).map((value) => (
+                        <label
+                          key={value}
+                          className={mark === value ? 'is-selected' : ''}
+                        >
+                          <input
+                            type="radio"
+                            name={`custody-${item.id}`}
+                            checked={mark === value}
+                            onChange={() => setCustodyMark(item.id, value)}
+                          />
+                          <span>{custodyMarkLabels[value]}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    {submitted && (
+                      <div className="custody-item__key">
+                        <strong>
+                          Leitura correta:{' '}
+                          {custodyMarkLabels[item.expected]}
+                        </strong>
+                        <p>{item.rationale}</p>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -691,10 +881,10 @@ function CaseExperience() {
 
                     <div className="evidence-note evidence-note--cta">
                       <div>
-                        <strong>Registre a observação no passo 3</strong>
+                        <strong>Registre a observação no Registro</strong>
                         <p>
                           Descreva o que esta fonte mostra — valores, horários e campos — sem
-                          antecipar a causa. As hipóteses ficam no passo 4.
+                          antecipar a causa. As hipóteses ficam na aba Hipóteses.
                         </p>
                       </div>
                       <button
@@ -719,7 +909,7 @@ function CaseExperience() {
                 <h2>Observações das fontes</h2>
                 <p>
                   Registre fatos verificáveis de cada fonte: valores, horários, campos e o que ainda
-                  precisa ser correlacionado. A causa provável pertence ao passo de hipóteses.
+                  precisa ser correlacionado. A causa provável pertence à aba Hipóteses.
                 </p>
               </div>
               <Tag tone={notesCount > 0 ? 'green' : 'neutral'}>
@@ -799,11 +989,11 @@ function CaseExperience() {
               <div>
                 <h2>Evidências e hipóteses</h2>
                 <p>
-                  Selecione o par de fontes que sustenta a causa imediata e classifique cada
-                  hipótese. A classificação é avaliada no relatório.
+                  Selecione as fontes que sustentam a conclusão e classifique cada hipótese. A
+                  classificação é avaliada no relatório.
                 </p>
               </div>
-              <Tag tone={activeProgress.evidenceSelection.length === 2 ? 'teal' : 'neutral'}>
+              <Tag tone={activeProgress.evidenceSelection.length > 0 ? 'teal' : 'neutral'}>
                 {activeProgress.evidenceSelection.length}{' '}
                 {activeProgress.evidenceSelection.length === 1
                   ? 'fonte selecionada'
@@ -813,9 +1003,14 @@ function CaseExperience() {
 
             <section className="analysis-block">
               <div className="analysis-block__head">
-                <h3>Tarefa 1 — Quais duas fontes documentam a configuração entregue e o efeito observado?</h3>
+                <h3>
+                  {copy.evidenceTask ??
+                    'Tarefa 1 — Quais duas fontes documentam a configuração entregue e o efeito observado?'}
+                </h3>
               </div>
-              <p className="analysis-instruction">{activeCase.evidenceSelectionPrompt}</p>
+              <p className="analysis-instruction">
+                {copy.evidenceSelectionIntro ?? activeCase.evidenceSelectionPrompt}
+              </p>
               <div className="evidence-select-grid">
                 {activeCase.evidence.map((evidence) => {
                   const checked = evidenceSelection.has(evidence.id)
@@ -938,10 +1133,10 @@ function CaseExperience() {
           <div>
             <div className="case-section-head">
               <div>
-                <h2>Linha do tempo normalizada</h2>
+                <h2>{copy.timelineTitle ?? 'Linha do tempo normalizada'}</h2>
                 <p>
-                  As fontes usam fusos diferentes. Ordene os eventos pelo momento em que ocorreram,
-                  não pela ordem em que aparecem nos extratos. Use as setas para reposicionar.
+                  {copy.timelineIntro ??
+                    'As fontes usam fusos diferentes. Ordene os eventos pelo momento em que ocorreram, não pela ordem em que aparecem nos extratos. Use as setas para reposicionar.'}
                 </p>
               </div>
               <div className="case-section-head__actions">
@@ -962,8 +1157,8 @@ function CaseExperience() {
             <div className="timeline-note">
               <Clock size={16} aria-hidden="true" />
               <p>
-                A captura E-05 e o firewall E-03 estão em UTC. O DHCP, o DNS interno e o servidor do
-                portal usam BRT (UTC-3). Converta antes de comparar.
+                {copy.timelineNote ??
+                  'A captura E-05 e o firewall E-03 estão em UTC. O DHCP, o DNS interno e o servidor do portal usam BRT (UTC-3). Converta antes de comparar.'}
               </p>
             </div>
 
@@ -1043,16 +1238,70 @@ function CaseExperience() {
           </div>
         )}
 
+        {activeTab === 'quesitos' && quesitos.length > 0 && (
+          <div>
+            <div className="case-section-head">
+              <div>
+                <h2>Quesitos do juízo</h2>
+                <p>
+                  Responda cada quesito com fundamento nas fontes. Extensão mínima e termos técnicos
+                  são verificados; a resposta de referência aparece após a submissão.
+                </p>
+              </div>
+              <Tag tone={quesitosAnswered === quesitos.length ? 'green' : 'neutral'}>
+                {quesitosAnswered} de {quesitos.length} completos
+              </Tag>
+            </div>
+
+            <div className="quesito-list">
+              {quesitos.map((quesito) => {
+                const value = activeProgress.quesitos[quesito.id] ?? ''
+                const chars = value.trim().length
+                return (
+                  <article className="quesito" key={quesito.id}>
+                    <div className="quesito__head">
+                      <span className="mono">{quesito.id}</span>
+                      <h3>{quesito.prompt}</h3>
+                    </div>
+                    <p className="quesito__guidance">{quesito.guidance}</p>
+                    <div className="field">
+                      <label htmlFor={`quesito-${quesito.id}`}>
+                        Resposta ao quesito {quesito.id}
+                      </label>
+                      <textarea
+                        id={`quesito-${quesito.id}`}
+                        rows={5}
+                        value={value}
+                        disabled={Boolean(submitted)}
+                        onChange={(event) => updateQuesito(quesito.id, event.target.value)}
+                      />
+                      <span className="report-field__count mono">
+                        {chars} caracteres · mínimo {quesito.minLength}
+                      </span>
+                    </div>
+                    {submitted && (
+                      <div className="quesito__key">
+                        <strong>Resposta de referência</strong>
+                        <p>{quesito.referenceAnswer}</p>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'relatorio' && (
           <div>
             {!submitted ? (
               <>
                 <div className="case-section-head">
                   <div>
-                    <h2>Conclusão e relatório técnico</h2>
+                    <h2>{copy.reportTitle ?? 'Conclusão e relatório técnico'}</h2>
                     <p>
-                      Escolha a causa, explicite o limite da conclusão e escreva um relatório que
-                      separe fatos, inferência, limitações e recomendações.
+                      {copy.reportIntro ??
+                        'Escolha a causa, explicite o limite da conclusão e escreva um relatório que separe fatos, inferência, limitações e recomendações.'}
                     </p>
                   </div>
                   <Tag tone="amber">avaliação por rubrica</Tag>
@@ -1075,9 +1324,9 @@ function CaseExperience() {
                 <div className="report-layout">
                   <div className="report-main">
                     <section className="report-block">
-                      <h3>Tarefa 3 — Qual causa explica o incidente?</h3>
+                      <h3>{copy.conclusionTask ?? 'Tarefa 3 — Qual causa explica o incidente?'}</h3>
                       <fieldset className="report-options">
-                        <legend className="sr-only">Causa técnica provável</legend>
+                        <legend className="sr-only">{conclusionLabel}</legend>
                         {activeCase.conclusionOptions.map((option) => (
                           <label
                             key={option.id}
@@ -1131,9 +1380,9 @@ function CaseExperience() {
                         </div>
                       </div>
                       <div>
-                        <h3>Afirmação não sustentada</h3>
+                        <h3>{unsupportedLabel}</h3>
                         <fieldset className="report-options report-options--compact">
-                          <legend className="sr-only">Afirmação não sustentada</legend>
+                          <legend className="sr-only">{unsupportedLabel}</legend>
                           {activeCase.unsupportedClaimOptions.map((option) => (
                             <label
                               key={option.id}
@@ -1169,12 +1418,24 @@ function CaseExperience() {
                       </p>
                       {(
                         [
-                          ['facts', 'Fatos observados', activeCase.reportGuidance.facts],
-                          ['inference', 'Inferência técnica', activeCase.reportGuidance.inference],
-                          ['limitations', 'Limitações e incertezas', activeCase.reportGuidance.limitations],
+                          [
+                            'facts',
+                            reportFieldLabels.facts ?? 'Fatos observados',
+                            activeCase.reportGuidance.facts,
+                          ],
+                          [
+                            'inference',
+                            reportFieldLabels.inference ?? 'Inferência técnica',
+                            activeCase.reportGuidance.inference,
+                          ],
+                          [
+                            'limitations',
+                            reportFieldLabels.limitations ?? 'Limitações e incertezas',
+                            activeCase.reportGuidance.limitations,
+                          ],
                           [
                             'recommendations',
-                            'Recomendações',
+                            reportFieldLabels.recommendations ?? 'Recomendações',
                             activeCase.reportGuidance.recommendations,
                           ],
                         ] as const
@@ -1189,7 +1450,8 @@ function CaseExperience() {
                             onChange={(event) => updateReportField(field, event.target.value)}
                           />
                           <span className="report-field__count mono">
-                            {activeProgress.report[field].trim().length} caracteres · mínimo 60
+                            {activeProgress.report[field].trim().length} caracteres · mínimo{' '}
+                            {reportMinLength}
                           </span>
                         </div>
                       ))}
@@ -1200,27 +1462,60 @@ function CaseExperience() {
                     <div className="aside-panel">
                       <h3 className="aside-panel__title">Rubrica</h3>
                       <ul className="rubric-list">
-                        <li><span>Causa técnica provável</span><strong className="mono">25</strong></li>
-                        <li><span>Correlação de evidências</span><strong className="mono">20</strong></li>
-                        <li><span>Teste de hipóteses</span><strong className="mono">15</strong></li>
-                        <li><span>Linha do tempo</span><strong className="mono">15</strong></li>
-                        <li><span>Limite da conclusão</span><strong className="mono">5</strong></li>
-                        <li><span>Relatório técnico</span><strong className="mono">20</strong></li>
+                        {rubricItems.map((item) => (
+                          <li key={item.id}>
+                            <span>{item.label}</span>
+                            <strong className="mono">{item.max}</strong>
+                          </li>
+                        ))}
                       </ul>
                       <p className="rubric-note">
-                        Aprovação a partir de {CASE_PASS_SCORE}/100. O gabarito completo aparece
-                        depois da submissão.
+                        {copy.rubricNote ??
+                          `Aprovação a partir de ${CASE_PASS_SCORE}/100. O gabarito completo aparece depois da submissão.`}
                       </p>
                     </div>
                     <div className="aside-panel aside-panel--muted">
                       <strong>Checklist antes de submeter</strong>
                       <ul className="plain-list">
-                        <li>{activeProgress.evidenceOpened.length >= 4 ? '✓' : '○'} Pelo menos 4 evidências examinadas</li>
-                        <li>{activeProgress.evidenceSelection.length > 0 ? '✓' : '○'} Par de evidências selecionado</li>
-                        <li>{steps.find((step) => step.id === 'analysis')?.complete ? '✓' : '○'} Todas as hipóteses classificadas</li>
-                        <li>{steps.find((step) => step.id === 'timeline')?.complete ? '✓' : '○'} Linha do tempo registrada</li>
-                        <li>{activeProgress.conclusionId ? '✓' : '○'} Causa escolhida</li>
-                        <li>{activeProgress.unsupportedClaimId ? '✓' : '○'} Limite da conclusão indicado</li>
+                        <li>
+                          {activeProgress.evidenceOpened.length >= (activeCase.evidenceOpenMin ?? 4)
+                            ? '✓'
+                            : '○'}{' '}
+                          Pelo menos {activeCase.evidenceOpenMin ?? 4} evidências examinadas
+                        </li>
+                        <li>
+                          {activeProgress.evidenceSelection.length > 0 ? '✓' : '○'} Evidências
+                          selecionadas
+                        </li>
+                        <li>
+                          {steps.find((step) => step.id === 'record')?.complete ? '✓' : '○'}{' '}
+                          Observações registradas
+                        </li>
+                        <li>
+                          {steps.find((step) => step.id === 'analysis')?.complete ? '✓' : '○'} Todas
+                          as hipóteses classificadas
+                        </li>
+                        {custodyItems.length > 0 && (
+                          <li>
+                            {steps.find((step) => step.id === 'custody')?.complete ? '✓' : '○'}{' '}
+                            Custódia avaliada
+                          </li>
+                        )}
+                        <li>
+                          {steps.find((step) => step.id === 'timeline')?.complete ? '✓' : '○'}{' '}
+                          Linha do tempo registrada
+                        </li>
+                        {quesitos.length > 0 && (
+                          <li>
+                            {steps.find((step) => step.id === 'quesitos')?.complete ? '✓' : '○'}{' '}
+                            Quesitos respondidos
+                          </li>
+                        )}
+                        <li>{activeProgress.conclusionId ? '✓' : '○'} {conclusionLabel} escolhida</li>
+                        <li>
+                          {activeProgress.unsupportedClaimId ? '✓' : '○'} Limite da conclusão
+                          indicado
+                        </li>
                         <li>{activeProgress.confidence ? '✓' : '○'} Confiança declarada</li>
                       </ul>
                     </div>
@@ -1240,8 +1535,8 @@ function CaseExperience() {
                       <div className="reset-confirm">
                         <strong>Reiniciar apaga este rascunho?</strong>
                         <p>
-                          Evidências examinadas, anotações, hipóteses, linha do tempo e relatório serão
-                          removidos do armazenamento local ativo.
+                          Evidências examinadas, anotações, hipóteses, custódia, quesitos, linha do
+                          tempo e relatório serão removidos do progresso desta conta.
                         </p>
                         <div className="button-row">
                           <button type="button" className="button button--danger button--small" onClick={handleReset}>
@@ -1323,7 +1618,7 @@ function CaseExperience() {
                     <h3 className="result-panel__title">Registro</h3>
                     <dl className="result-summary">
                       <div>
-                        <dt>Causa escolhida</dt>
+                        <dt>{conclusionLabel}</dt>
                         <dd>
                           {activeCase.conclusionOptions.find((option) => option.id === activeProgress.conclusionId)?.label}
                         </dd>
@@ -1362,7 +1657,7 @@ function CaseExperience() {
 
                   <div className="gabarito-grid">
                     <article className="gabarito-block">
-                      <span className="mono">Causa</span>
+                      <span className="mono">{conclusionLabel}</span>
                       <h3>
                         {activeCase.conclusionOptions.find((option) => option.id === activeCase.correctConclusionId)?.label}
                       </h3>
@@ -1383,9 +1678,9 @@ function CaseExperience() {
                         })}
                       </ul>
                       <p>
-                        O par conecta a configuração entregue ao cliente (E-01) ao efeito observado na
-                        consulta (E-05). Outras fontes corroboram ou excluem hipóteses, mas não formam
-                        esse par mínimo.
+                        {copy.evidenceSelectionExplanation ??
+                          copy.evidenceSelectionIntro ??
+                          'O par conecta a configuração entregue ao cliente (E-01) ao efeito observado na consulta (E-05). Outras fontes corroboram ou excluem hipóteses, mas não formam esse par mínimo.'}
                       </p>
                     </article>
                     <article className="gabarito-block">
@@ -1403,7 +1698,7 @@ function CaseExperience() {
                       </ul>
                     </article>
                     <article className="gabarito-block">
-                      <span className="mono">Afirmação não sustentada</span>
+                      <span className="mono">{unsupportedLabel}</span>
                       <h3>
                         {activeCase.unsupportedClaimOptions.find((option) => option.id === activeCase.unsupportedClaimId)?.label}
                       </h3>
@@ -1421,10 +1716,10 @@ function CaseExperience() {
                     </div>
                     {(
                       [
-                        ['facts', 'Fatos observados'],
-                        ['inference', 'Inferência técnica'],
-                        ['limitations', 'Limitações'],
-                        ['recommendations', 'Recomendações'],
+                        ['facts', reportFieldLabels.facts ?? 'Fatos observados'],
+                        ['inference', reportFieldLabels.inference ?? 'Inferência técnica'],
+                        ['limitations', reportFieldLabels.limitations ?? 'Limitações'],
+                        ['recommendations', reportFieldLabels.recommendations ?? 'Recomendações'],
                       ] as const
                     ).map(([field, label]) => (
                       <div className="reference-report__field" key={field}>

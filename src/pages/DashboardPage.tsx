@@ -3,7 +3,7 @@ import { ArrowRight, ChevronRight, FlaskConical, FolderSearch, LockKeyhole } fro
 import { useAuth } from '../context/AuthContext'
 import { useProgress } from '../context/ProgressContext'
 import { getLesson, getTrackLessons, labs, tracks } from '../data/courses'
-import { investigationCases } from '../data/cases'
+import { getCaseById, investigationCases } from '../data/cases'
 import { getCaseProgress } from '../lib/progress'
 import {
   accessForContent,
@@ -36,15 +36,24 @@ export function DashboardPage() {
   const nextTrack = nextLesson
     ? tracks.find((track) => track.id === nextLesson.trackId)
     : undefined
-
-  const caseDefinition = investigationCases[0]
-  const caseProgress = getCaseProgress(progress, caseDefinition.id)
-  const caseStarted =
-    caseProgress.evidenceOpened.length > 0 || caseProgress.actions.length > 0
-  const caseSubmitted = Boolean(caseProgress.submitted?.passed)
-  const caseAccess = accessForContent(caseDefinition.id, account.expertise, progress, {
-    admin: isAdmin,
+  const recommendedCase =
+    recommendation?.type === 'case' ? getCaseById(recommendation.id) : undefined
+  const recommendedCaseProgress = recommendedCase
+    ? getCaseProgress(progress, recommendedCase.id)
+    : undefined
+  const casesAccessible = investigationCases.filter((caseDefinition) => {
+    const access = accessForContent(caseDefinition.id, account.expertise, progress, {
+      admin: isAdmin,
+    })
+    return access.allowed || access.historical
   })
+  const casesPassed = investigationCases.filter((caseDefinition) => {
+    return Boolean(getCaseProgress(progress, caseDefinition.id).submitted?.passed)
+  }).length
+  const casesStarted = investigationCases.filter((caseDefinition) => {
+    const record = getCaseProgress(progress, caseDefinition.id)
+    return record.evidenceOpened.length > 0 || record.actions.length > 0
+  }).length
 
   const networkScenarios = Object.keys(progress.labs).filter((id) =>
     id.startsWith('lab-redes:'),
@@ -75,8 +84,8 @@ export function DashboardPage() {
         <p className="home-intro__lede">
           Olá, {account.displayName}. Seu ponto de partida é{' '}
           <strong>{level.label.toLowerCase()}</strong>. O PeritSec combina explicação curta, prática
-          verificável e progressão por competências — sem tirar conclusões por você. Tudo funciona no
-          seu computador, com dados sintéticos e nenhuma ação sobre redes reais.
+          verificável e progressão por competências — sem tirar conclusões por você. O progresso fica
+          associado à sua conta, com dados sintéticos e nenhuma ação sobre redes reais.
         </p>
         <div className="home-intro__actions">
           <Link className="button button--primary" to={primaryAction.to}>
@@ -107,7 +116,9 @@ export function DashboardPage() {
               <h3>{recommendation.title}</h3>
               <p>
                 {recommendation.type === 'case' && recommendation.inProgress
-                  ? `Você já abriu ${caseProgress.evidenceOpened.length} de ${caseDefinition.evidence.length} evidências. Retome o exame, teste as hipóteses e submeta o relatório quando os dados sustentarem uma conclusão.`
+                  ? `Você já abriu ${recommendedCaseProgress?.evidenceOpened.length ?? 0} de ${
+                      recommendedCase?.evidence.length ?? 0
+                    } evidências. Retome o exame, teste as hipóteses e submeta o relatório quando os dados sustentarem uma conclusão.`
                   : recommendation.type === 'lab'
                     ? 'Este laboratório faz parte da sua próxima etapa. O avanço é registrado quando o objetivo técnico é verificado, não apenas quando a página abre.'
                     : contentInfo(recommendation.id)?.summary ??
@@ -226,24 +237,24 @@ export function DashboardPage() {
             <FolderSearch size={20} aria-hidden="true" />
             <h3>Casos periciais</h3>
             <p>
-              Investigações completas com escopo, evidências, hipóteses, linha do tempo e relatório
-              avaliado por rubrica. Nem toda fonte disponível sustenta uma acusação — e isso faz parte
-              do exercício.
+              {investigationCases.length} investigações completas com escopo, evidências, hipóteses,
+              linha do tempo e relatório avaliado por rubrica. Nem toda fonte disponível sustenta uma
+              acusação — e isso faz parte do exercício.
             </p>
-            {!caseAccess.allowed && !caseAccess.historical && (
+            {casesAccessible.length === 0 && (
               <p className="practice-card__lock">
                 <LockKeyhole size={13} aria-hidden="true" />
-                Requer nível avançado e pré-requisitos de rede, logs e custódia.
+                Os dossiês exigem nível efetivo e pré-requisitos de rede, logs, custódia e método.
               </p>
             )}
-            <Link className="text-link" to={`/casos/${caseDefinition.id}`}>
-              {caseSubmitted
-                ? 'Revisar o caso concluído'
-                : caseStarted
-                  ? 'Retomar o caso em análise'
-                  : caseAccess.allowed
-                    ? 'Abrir o primeiro caso'
-                    : 'Conhecer o caso e os requisitos'}{' '}
+            <Link className="text-link" to="/casos">
+              {casesPassed > 0
+                ? `${casesPassed} ${casesPassed === 1 ? 'caso concluído' : 'casos concluídos'} · revisar dossiês`
+                : casesStarted > 0
+                  ? 'Retomar os casos em análise'
+                  : casesAccessible.length > 0
+                    ? 'Explorar os casos periciais'
+                    : 'Conhecer os casos e os requisitos'}{' '}
               <ChevronRight size={14} aria-hidden="true" />
             </Link>
           </article>

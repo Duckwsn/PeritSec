@@ -641,7 +641,7 @@ function CryptoLabExperience() {
             <div>
               <strong>Laboratório concluído</strong>
               <p>
-                Registro local em {formatDateTime(completedRecord.completedAt)}. Refazer o desafio não
+                Concluído em {formatDateTime(completedRecord.completedAt)}. Refazer o desafio não
                 apaga esta conclusão.
               </p>
             </div>

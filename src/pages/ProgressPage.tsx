@@ -159,7 +159,6 @@ export function ProgressPage() {
     progress,
     storageAvailable,
     storageMode,
-    storageDataDir,
     storageUpdatedAt,
     storageError,
     backupNow,
@@ -265,7 +264,7 @@ export function ProgressPage() {
       versaoProgresso: progress.version,
       exportadoEm: new Date().toISOString(),
       observacao:
-        'Exportação local de progresso. Não inclui dados de terceiros, credenciais ou capturas reais.',
+        'Exportação de progresso. Não inclui dados de terceiros, credenciais ou capturas reais.',
       progresso: progress,
     }
     try {
@@ -289,7 +288,7 @@ export function ProgressPage() {
   function confirmReset() {
     resetAll()
     setResetArmed(false)
-    setDataMessage('Progresso apagado. A alteração será persistida no armazenamento ativo.')
+    setDataMessage('Progresso apagado. A alteração será gravada no serviço.')
   }
 
   return (
@@ -302,10 +301,10 @@ export function ProgressPage() {
             <span className="meta-item">
               <ShieldCheck size={14} aria-hidden="true" />{' '}
               {storageMode === 'postgresql'
-                ? 'PostgreSQL local ativo, por conta'
+                ? 'Progresso salvo na conta'
                 : storageMode === 'checking'
-                  ? 'verificando persistência'
-                  : 'servidor local indisponível'}
+                  ? 'verificando gravação'
+                  : 'gravação indisponível'}
             </span>
             <span className="meta-item">Nível efetivo: {level.label}</span>
             <span className="meta-item">
@@ -332,10 +331,10 @@ export function ProgressPage() {
         <div className="inline-warning" role="alert">
           <TriangleAlert size={17} aria-hidden="true" />
           <div>
-            <strong>O servidor local não confirmou a gravação.</strong>
+            <strong>A gravação não foi confirmada.</strong>
             <p>
-              As alterações ainda não foram confirmadas no PostgreSQL e estão apenas na memória desta
-              página. Verifique se a API local está em execução antes de continuar ou recarregar.
+              As alterações ainda não foram confirmadas no serviço e estão apenas na memória desta
+              página. Verifique sua conexão e tente novamente antes de recarregar.
             </p>
           </div>
         </div>
@@ -591,7 +590,7 @@ export function ProgressPage() {
       <section aria-labelledby="activity-title">
         <SectionHeading
           title="Histórico de atividade"
-          description="Registro local das ações que alteraram o progresso. Não inclui respostas completas de exercícios."
+          description="Registro das ações que alteraram o progresso. Não inclui respostas completas de exercícios."
         />
         <div className="activity-ledger" id="activity-title">
           {progress.activity.length === 0 ? (
@@ -646,7 +645,7 @@ export function ProgressPage() {
       <section className="data-section" aria-labelledby="data-title">
         <SectionHeading
           title="Onde seu progresso está"
-          description="O estado é gravado no PostgreSQL local, em um registro separado para esta conta. Sem o backend conectado ao banco, a gravação fica pausada e a interface informa o problema."
+          description="O estado é gravado no serviço do PeritSec, em um registro separado para esta conta. Se a gravação estiver pausada, a interface informa o problema."
         />
         <div className="data-panel" id="data-title">
           <div className="data-panel__copy">
@@ -658,10 +657,10 @@ export function ProgressPage() {
                   <HardDrive size={15} aria-hidden="true" />
                 )}
                 {storageMode === 'postgresql'
-                  ? `PostgreSQL local · ${username}`
+                  ? `Progresso na conta · ${username}`
                   : storageMode === 'checking'
-                    ? 'verificando PostgreSQL local'
-                    : 'PostgreSQL local indisponível'}
+                    ? 'verificando gravação'
+                    : 'gravação indisponível'}
               </span>
               {storageMode === 'postgresql' && storageUpdatedAt && (
                 <span className="mono storage-status__time">
@@ -673,30 +672,28 @@ export function ProgressPage() {
             {storageMode === 'postgresql' ? (
               <>
                 <p>
-                  O progresso desta conta é gravado no PostgreSQL, separado das demais contas. Os
-                  arquivos de backup ficam no subdiretório <code>backups/</code> de{' '}
-                  <code>{storageDataDir || 'diretório de dados do aplicativo'}</code>. Não existe
+                  O progresso desta conta é gravado no serviço do PeritSec, separado das demais
+                  contas. Os arquivos de backup ficam no diretório de dados do serviço. Não existe
                   cópia automática em <code>localStorage</code>.
                 </p>
                 <p>
                   Cada backup é um arquivo JSON vinculado a esta conta, com hash SHA-256 registrado
-                  no PostgreSQL. A restauração confere o hash e cria uma cópia de segurança do estado
-                  atual antes de substituí-lo.
+                  no banco de dados. A restauração confere o hash e cria uma cópia de segurança do
+                  estado atual antes de substituí-lo.
                 </p>
               </>
             ) : storageMode === 'checking' ? (
-              <p>Verificando se o PostgreSQL local está disponível para gravar o progresso.</p>
+              <p>Verificando se o serviço de dados está disponível para gravar o progresso.</p>
             ) : (
               <>
                 <p>
-                  O PostgreSQL local não respondeu. A gravação está pausada; o progresso não é
+                  O serviço de dados não respondeu. A gravação está pausada; o progresso não é
                   copiado para o navegador, enviado a outra conta nem substituído por um estado
                   anônimo.
                 </p>
                 <p>
-                  Para retomar a persistência, inicie o aplicativo com <code>npm run dev</code> ou{' '}
-                  <code>npm start</code> e recarregue a página. A conta continua sendo a mesma
-                  enquanto a sessão local estiver válida.
+                  Para retomar a gravação, recarregue a página em alguns instantes. A conta continua
+                  sendo a mesma enquanto a sessão estiver válida.
                 </p>
                 {storageError && (
                   <p className="data-panel__error">Detalhe técnico: {storageError}.</p>

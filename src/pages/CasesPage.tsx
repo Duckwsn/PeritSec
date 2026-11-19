@@ -13,7 +13,7 @@ import {
   CASE_CATALOG_PREVIEW,
   investigationCases,
 } from '../data/cases'
-import { CASE_PASS_SCORE, evidenceKindLabel } from '../lib/caseEngine'
+import { CASE_PASS_SCORE, caseRubricItems, evidenceKindLabel } from '../lib/caseEngine'
 import { getCaseProgress } from '../lib/progress'
 import {
   accessForContent,
@@ -33,168 +33,204 @@ export function CasesPage() {
   const { account, isAdmin } = useAuth()
   const { progress } = useProgress()
   if (!account) return null
-  const caseDefinition = investigationCases[0]
-  const caseProgress = getCaseProgress(progress, caseDefinition.id)
-  const submitted = caseProgress.submitted
-  const started = caseProgress.evidenceOpened.length > 0 || caseProgress.actions.length > 0
-  const caseAccess = accessForContent(caseDefinition.id, account.expertise, progress, {
-    admin: isAdmin,
-  })
-  const locked = !caseAccess.allowed && !caseAccess.historical
   const level = effectiveLevel(account.expertise, progress)
   const recommendation = nextActivity(account.expertise, progress, { admin: isAdmin })
-  const blockedReason = locked ? explainBlock(caseAccess, recommendation) : null
+  const totalEvidence = investigationCases.reduce(
+    (total, caseDefinition) => total + caseDefinition.evidence.length,
+    0,
+  )
 
   return (
     <div className="cases-page">
       <PageHeader
         title="Casos periciais para aplicar o método completo."
-        lede="Um caso pericial completo exige examinar fontes, testar hipóteses, ordenar eventos e comunicar o que as evidências sustentam — inclusive quando não sustentam uma acusação."
+        lede="Dossiês sintéticos exigem examinar fontes, testar hipóteses, ordenar eventos e comunicar o que as evidências sustentam — inclusive quando não sustentam uma acusação."
         meta={
           <>
             <span className="meta-item">Nível efetivo: {level.label}</span>
-            <span className="meta-item">1 caso completo disponível</span>
-            <span className="meta-item">8 fontes sintéticas</span>
-            <span className="meta-item">relatório com rubrica</span>
+            <span className="meta-item">
+              {investigationCases.length} casos completos disponíveis
+            </span>
+            <span className="meta-item">{totalEvidence} fontes sintéticas</span>
+            <span className="meta-item">relatório e rubrica por caso</span>
           </>
         }
       />
 
       <section className="page-section">
         <SectionHeading
-          title="Dossiê em aberto"
-          description="Dados sintéticos, personagens fictícios e escopo educacional autorizado."
+          title="Dossiês em aberto"
+          description="Dados sintéticos, personagens fictícios e escopo educacional autorizado. Cada caso tem critérios, fases e limites próprios."
         />
 
-        <article className="case-dossier" aria-labelledby="case-dossier-title">
-          <div className="case-dossier__body">
-            <header className="case-dossier__top">
-              <div className="case-dossier__meta">
-                <span className="mono case-dossier__code">{caseDefinition.code}</span>
-                {locked ? (
-                  <Tag tone="rust">requer preparação</Tag>
-                ) : submitted?.passed ? (
-                  <Tag tone="green">concluído · {submitted.score}/100</Tag>
-                ) : submitted ? (
-                  <Tag tone="amber">relatório submetido · {submitted.score}/100 · revisar</Tag>
-                ) : started ? (
-                  <Tag tone="amber">análise em andamento</Tag>
-                ) : (
-                  <Tag tone="teal">disponível</Tag>
-                )}
-                <Tag tone="neutral">
-                  {difficultyLabel[caseDefinition.difficulty] ?? caseDefinition.difficulty}
-                </Tag>
-                <span className="case-dossier__duration">
-                  {caseDefinition.durationMinutes} min estimados
-                </span>
-              </div>
+        <div className="case-dossier-list">
+          {investigationCases.map((caseDefinition) => {
+            const caseProgress = getCaseProgress(progress, caseDefinition.id)
+            const submitted = caseProgress.submitted
+            const started =
+              caseProgress.evidenceOpened.length > 0 || caseProgress.actions.length > 0
+            const caseAccess = accessForContent(
+              caseDefinition.id,
+              account.expertise,
+              progress,
+              { admin: isAdmin },
+            )
+            const locked = !caseAccess.allowed && !caseAccess.historical
+            const blockedReason = locked
+              ? explainBlock(caseAccess, recommendation)
+              : null
+            const rubricItems = caseRubricItems(caseDefinition)
 
-              <h3 id="case-dossier-title">{caseDefinition.title}</h3>
-              <p className="case-dossier__subtitle">{caseDefinition.subtitle}</p>
-            </header>
+            return (
+              <article
+                className="case-dossier"
+                key={caseDefinition.id}
+                aria-labelledby={`case-${caseDefinition.id}-title`}
+              >
+                <div className="case-dossier__body">
+                  <header className="case-dossier__top">
+                    <div className="case-dossier__meta">
+                      <span className="mono case-dossier__code">{caseDefinition.code}</span>
+                      {locked ? (
+                        <Tag tone="rust">requer preparação</Tag>
+                      ) : submitted?.passed ? (
+                        <Tag tone="green">concluído · {submitted.score}/100</Tag>
+                      ) : submitted ? (
+                        <Tag tone="amber">
+                          relatório submetido · {submitted.score}/100 · revisar
+                        </Tag>
+                      ) : started ? (
+                        <Tag tone="amber">análise em andamento</Tag>
+                      ) : (
+                        <Tag tone="teal">disponível</Tag>
+                      )}
+                      <Tag tone="neutral">
+                        {difficultyLabel[caseDefinition.difficulty] ??
+                          caseDefinition.difficulty}
+                      </Tag>
+                      <span className="case-dossier__duration">
+                        {caseDefinition.durationMinutes} min estimados
+                      </span>
+                    </div>
 
-            <div className="case-dossier__context">
-              <p>{caseDefinition.context[0]}</p>
-              <p>{caseDefinition.context[1]}</p>
-            </div>
+                    <h3 id={`case-${caseDefinition.id}-title`}>
+                      {caseDefinition.title}
+                    </h3>
+                    <p className="case-dossier__subtitle">{caseDefinition.subtitle}</p>
+                  </header>
 
-            {locked && blockedReason ? (
-              <section className="case-dossier__section case-dossier__locked" aria-labelledby="case-locked-title">
-                <h4 id="case-locked-title">Preparação necessária</h4>
-                <p>{blockedReason.text}</p>
-                {blockedReason.requirements.length > 0 && (
-                  <ul className="gate-requirements">
-                    {blockedReason.requirements.map((requirement) => (
-                      <li key={requirement}>{requirement}</li>
-                    ))}
-                  </ul>
-                )}
-                {blockedReason.next && (
-                  <Link className="text-link" to={blockedReason.next.href}>
-                    {blockedReason.next.label}
-                    <ArrowRight size={14} aria-hidden="true" />
-                  </Link>
-                )}
-              </section>
-            ) : (
-              <>
-                <section className="case-dossier__section" aria-labelledby="case-evidence-title">
-                  <h4 id="case-evidence-title">Inventário de evidências</h4>
-                  <ul className="evidence-preview">
-                    {caseDefinition.evidence.map((evidence) => (
-                      <li key={evidence.id}>
-                        <span className="mono evidence-preview__id">{evidence.id}</span>
-                        <span className="evidence-preview__title">{evidence.title}</span>
-                        <span className="evidence-preview__kind">
-                          {evidenceKindLabel(evidence.kind)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                <section className="case-dossier__section" aria-labelledby="case-criteria-title">
-                  <h4 id="case-criteria-title">Critérios de avaliação</h4>
-                  <p className="case-dossier__criteria-lede">
-                    A soma dos critérios compõe 100 pontos. A submissão é aprovada a partir de{' '}
-                    {CASE_PASS_SCORE}.
-                  </p>
-                  <ul className="rubric-list case-dossier__criteria">
-                    <li>
-                      <span>Causa provável</span>
-                      <strong className="mono">25 pontos</strong>
-                    </li>
-                    <li>
-                      <span>Correlação de evidências</span>
-                      <strong className="mono">20 pontos</strong>
-                    </li>
-                    <li>
-                      <span>Hipóteses e linha do tempo</span>
-                      <strong className="mono">30 pontos</strong>
-                    </li>
-                    <li>
-                      <span>Limite da conclusão</span>
-                      <strong className="mono">5 pontos</strong>
-                    </li>
-                    <li>
-                      <span>Relatório</span>
-                      <strong className="mono">20 pontos</strong>
-                    </li>
-                  </ul>
-                  <div className="case-dossier__rubric-note">
-                    <Hash size={15} aria-hidden="true" />
-                    <span>Hashes SHA-256 reais sobre extratos sintéticos.</span>
+                  <div className="case-dossier__context">
+                    <p>{caseDefinition.context[0]}</p>
+                    {caseDefinition.context[1] && <p>{caseDefinition.context[1]}</p>}
                   </div>
-                </section>
-              </>
-            )}
 
-            <footer className="case-dossier__foot">
-              <div className="case-dossier__objectives">
-                <span className="case-dossier__label">Objetivo principal</span>
-                <p>{caseDefinition.objectives[0]}</p>
-                {locked && (
-                  <p className="case-dossier__lock-note">
-                    Disponível a partir do nível {levelLabel(caseAccess.minLevel)} e com os
-                    pré-requisitos de rede, logs, custódia, tráfego e método.
-                  </p>
-                )}
-              </div>
-              <Link className="button button--primary" to={`/casos/${caseDefinition.id}`}>
-                <FolderSearch size={17} aria-hidden="true" />
-                {locked
-                  ? 'Ver requisitos'
-                  : submitted?.passed
-                    ? 'Revisar análise'
-                    : started
-                      ? 'Retomar investigação'
-                      : 'Abrir dossiê'}
-                <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            </footer>
-          </div>
-        </article>
+                  {locked && blockedReason ? (
+                    <section
+                      className="case-dossier__section case-dossier__locked"
+                      aria-labelledby={`case-${caseDefinition.id}-locked`}
+                    >
+                      <h4 id={`case-${caseDefinition.id}-locked`}>
+                        Preparação necessária
+                      </h4>
+                      <p>{blockedReason.text}</p>
+                      {blockedReason.requirements.length > 0 && (
+                        <ul className="gate-requirements">
+                          {blockedReason.requirements.map((requirement) => (
+                            <li key={requirement}>{requirement}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {blockedReason.next && (
+                        <Link className="text-link" to={blockedReason.next.href}>
+                          {blockedReason.next.label}
+                          <ArrowRight size={14} aria-hidden="true" />
+                        </Link>
+                      )}
+                    </section>
+                  ) : (
+                    <>
+                      <section
+                        className="case-dossier__section"
+                        aria-labelledby={`case-${caseDefinition.id}-evidence`}
+                      >
+                        <h4 id={`case-${caseDefinition.id}-evidence`}>
+                          Inventário de evidências
+                        </h4>
+                        <ul className="evidence-preview">
+                          {caseDefinition.evidence.map((evidence) => (
+                            <li key={evidence.id}>
+                              <span className="mono evidence-preview__id">
+                                {evidence.id}
+                              </span>
+                              <span className="evidence-preview__title">
+                                {evidence.title}
+                              </span>
+                              <span className="evidence-preview__kind">
+                                {evidenceKindLabel(evidence.kind)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+
+                      <section
+                        className="case-dossier__section"
+                        aria-labelledby={`case-${caseDefinition.id}-criteria`}
+                      >
+                        <h4 id={`case-${caseDefinition.id}-criteria`}>
+                          Critérios de avaliação
+                        </h4>
+                        <p className="case-dossier__criteria-lede">
+                          A soma dos critérios compõe 100 pontos. A submissão é aprovada
+                          a partir de {CASE_PASS_SCORE}.
+                        </p>
+                        <ul className="rubric-list case-dossier__criteria">
+                          {rubricItems.map((item) => (
+                            <li key={item.id}>
+                              <span>{item.label}</span>
+                              <strong className="mono">{item.max} pontos</strong>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="case-dossier__rubric-note">
+                          <Hash size={15} aria-hidden="true" />
+                          <span>Hashes SHA-256 reais sobre extratos sintéticos.</span>
+                        </div>
+                      </section>
+                    </>
+                  )}
+
+                  <footer className="case-dossier__foot">
+                    <div className="case-dossier__objectives">
+                      <span className="case-dossier__label">Objetivo principal</span>
+                      <p>{caseDefinition.objectives[0]}</p>
+                      {locked && (
+                        <p className="case-dossier__lock-note">
+                          Disponível a partir do nível {levelLabel(caseAccess.minLevel)} e
+                          com os pré-requisitos indicados acima.
+                        </p>
+                      )}
+                    </div>
+                    <Link
+                      className="button button--primary"
+                      to={`/casos/${caseDefinition.id}`}
+                    >
+                      <FolderSearch size={17} aria-hidden="true" />
+                      {locked
+                        ? 'Ver requisitos'
+                        : submitted?.passed
+                          ? 'Revisar análise'
+                          : started
+                            ? 'Retomar investigação'
+                            : 'Abrir dossiê'}
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </Link>
+                  </footer>
+                </div>
+              </article>
+            )
+          })}
+        </div>
       </section>
 
       <section className="page-section">
@@ -228,7 +264,7 @@ export function CasesPage() {
               </span>
               <h3>Correlacionar</h3>
             </div>
-            <p>Examine fontes distintas, normalize horários e selecione o que sustenta a causa.</p>
+            <p>Examine fontes distintas, normalize horários e selecione o que sustenta a conclusão.</p>
           </li>
           <li className="case-method__step">
             <div className="case-method__head">
@@ -275,9 +311,9 @@ export function CasesPage() {
       <div className="page-note">
         <Clock size={16} aria-hidden="true" />
         <p>
-          O caso é um exercício educacional. Não substitui orientação jurídica, protocolo
+          Os casos são exercícios educacionais. Não substituem orientação jurídica, protocolo
           institucional ou formação profissional regulamentada. As fontes legais e técnicas
-          utilizadas estão documentadas na página de metodologia.
+          utilizadas estão documentadas na página de metodologia e no próprio dossiê.
         </p>
       </div>
     </div>

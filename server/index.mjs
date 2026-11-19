@@ -219,13 +219,13 @@ function errorMessage(error) {
     return `Progresso recusado: ${error.message}.`
   }
   if (error?.code === 'USERNAME_TAKEN') {
-    return 'Este nome de usuário já está em uso nesta instalação.'
+    return 'Este nome de usuário já está em uso.'
   }
   if (error?.code === 'ANONYMOUS_ALREADY_MIGRATED') {
     return 'O progresso anterior já foi associado a uma conta.'
   }
   if (error?.code === 'ANONYMOUS_PROGRESS_UNAVAILABLE') {
-    return 'Não há progresso anterior disponível para importar nesta instalação.'
+    return 'Não há progresso anterior disponível para importar.'
   }
   if (error?.code === 'ACCOUNT_PROGRESS_EXISTS') {
     return 'Esta conta já possui progresso próprio; a importação não sobrescreve dados.'
@@ -237,15 +237,15 @@ function errorMessage(error) {
     return 'A sessão ativa não corresponde à conta que originou esta gravação. A alteração foi recusada.'
   }
   if (error?.code === 'LAST_ADMIN') {
-    return 'A instalação precisa de pelo menos uma conta administradora. Promova outra conta antes de rebaixar esta.'
+    return 'A plataforma precisa de pelo menos uma conta administradora. Promova outra conta antes de rebaixar esta.'
   }
   if (error?.code === 'INVALID_ROLE') {
     return 'Papel de conta inválido.'
   }
   if (error?.code === 'DATABASE_UNAVAILABLE') {
-    return 'O PostgreSQL local está indisponível. Inicie o banco e tente novamente.'
+    return 'O banco de dados está indisponível. Tente novamente em instantes.'
   }
-  return error?.message || 'Erro interno no servidor local.'
+  return error?.message || 'Erro interno no serviço.'
 }
 
 function clientKey(request, suffix) {
@@ -327,7 +327,7 @@ async function requireAdmin(request, response) {
   if (!auth) return null
   if (auth.account.role !== 'admin') {
     sendJson(response, 403, {
-      error: 'Esta área é restrita à conta administradora desta instalação.',
+      error: 'Esta área é restrita à conta administradora.',
       code: 'FORBIDDEN',
     })
     return null
